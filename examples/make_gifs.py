@@ -254,7 +254,7 @@ if __name__ == '__main__':
     my_job = Job(
         name = 'test_ga',
         experiment_names= ['test_ga'],
-        env_names = ['Walker-v0'],
+        env_names = ['BridgeWalker-v0'],
         ranks = [i for i in range(3)],
         load_dir = exp_root,
         organize_by_experiment=False,
