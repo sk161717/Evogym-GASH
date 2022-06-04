@@ -11,10 +11,10 @@ if __name__ == "__main__":
     np.random.seed(seed)
     
     run_ga(
-        pop_size = 10,
+        pop_size = 40,
         structure_shape = (5,5),
-        experiment_name = "test_ga",
-        max_evaluations = 100,
+        experiment_name = "Climber-v0_ga",
+        max_evaluations = 10000,
         train_iters = 50,
-        num_cores = 3,
+        num_cores = 8,
     )

@@ -10,6 +10,11 @@ class Structure():
 
         self.reward = 0
         self.fitness = self.compute_fitness()
+        self.fitness2=self.compute_fitness2()
+
+        #descriptor spaceの値を格納するタプル(p1,p2)
+        self.desc=None
+        self.centroid=None
         
         self.is_survivor = False
         self.prev_gen_label = 0
@@ -20,14 +25,24 @@ class Structure():
 
         self.fitness = self.reward
         return self.fitness
+    
+    def compute_fitness2(self):
+
+        self.fitness2 = self.reward
+        return self.fitness2
 
     def set_reward(self, reward):
 
         self.reward = reward
         self.compute_fitness()
+        
+    
+    def set_reward2(self,reward):
+        self.reward = reward
+        self.compute_fitness2()
 
     def __str__(self):
-        return f'\n\nStructure:\n{self.body}\nF: {self.fitness}\tR: {self.reward}\tID: {self.label}'
+        return f'\n\nStructure:\n{self.body}\nF: {self.fitness}\tR: {self.fitness2}\tR: {self.reward}\tID: {self.label}'
 
     def __repr__(self):
         return self.__str__()
@@ -161,6 +176,18 @@ def total_robots_explored_breakpoints_evals(pop_size, max_evals):
         out.append(num_evals)
 
     return out
+
+class UniqueLabel():
+    def __init__(self) -> None:
+        self.label=-1
+        self.prev_gen_last_label=-1
+
+    def give_label(self):
+        self.label+=1
+        return self.label
+    
+    def update_last_label(self):
+        self.prev_gen_last_label=self.label
 
 if __name__ == "__main__":
 

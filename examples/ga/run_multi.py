@@ -11,32 +11,96 @@ external_dir = os.path.join(root_dir, 'externals')
 sys.path.insert(0, root_dir)
 sys.path.insert(1, os.path.join(external_dir, 'pytorch_a2c_ppo_acktr_gail'))
 population_structure_hashes = {}
+generation=0
+save_path_controller1=None
+save_path_controller2=None
 
 from ppo import run_ppo
 from evogym import sample_robot, hashable
 import utils.mp_group as mp
-from utils.algo_utils import get_percent_survival_evals, mutate, TerminationCondition, Structure
-from pymoo.algorithms.moead import MOEAD
-from pymoo.model.callback import Callback
-from pymoo.factory import get_visualization, get_reference_directions
+from utils.algo_utils import mutate, TerminationCondition, Structure,UniqueLabel
+from make_gifs_multi import Job
 from pymoo.core.sampling import Sampling
 from pymoo.core.crossover import Crossover
 from pymoo.core.mutation import Mutation
+from pymoo.algorithms.moo.nsga2 import NSGA2
+from pymoo.optimize import minimize
+from pymoo.core.callback import Callback
+from pymoo.factory import get_visualization
+from pymoo.core.problem import Problem
+from pymoo.visualization.scatter import Scatter
+
+unique_label=UniqueLabel()
 
 
-class MyProblem():
-    pass
+class MyProblem(Problem):
+
+    def __init__(self,algorithm,tc,num_cores,env_name1,env_name2) -> None:
+        super().__init__(n_var=1, n_obj=2, n_constr=0)
+        self.algorithm=algorithm
+        self.tc = tc
+        self.num_cores=num_cores
+        self.env_name1=env_name1
+        self.env_name2=env_name2
+
+    def _evaluate(self, X, out, *args, **kwargs):
+        
+        fitness1=self.RunOneEnv(X,self.env_name1,save_path_controller1,1)
+        fitness2=self.RunOneEnv(X,self.env_name2,save_path_controller2,2)
+        out["F"] = np.column_stack([fitness1, fitness2])
+    
+    def RunOneEnv(self,X,env_name,save_path_controller,env_index):
+        group = mp.Group()
+        for x in X:
+            ppo_args = ((x[0].body, x[0].connections), self.tc, (save_path_controller, x[0].label),env_name)
+            if env_index==1:
+                group.add_job(run_ppo, ppo_args, callback=x[0].set_reward)
+            elif env_index==2:
+                group.add_job(run_ppo, ppo_args, callback=x[0].set_reward2)
+        group.run_jobs(self.num_cores)
+
+        ### COMPUTE FITNESS, SORT, AND SAVE ###
+        f=np.full((X.shape[0],1),None,dtype=object)
+        for i,x in enumerate(X):
+            if env_index==1:
+                x[0].compute_fitness()
+                f[i][0]=-x[0].fitness
+            elif env_index==2:
+                x[0].compute_fitness2()
+                f[i][0]=-x[0].fitness2
+        return f
+
 
 class MySampling(Sampling):
+    def __init__(self,structure_shape,experiment_name):
+        super().__init__()
+        self.structure_shape=structure_shape
+        self.experiment_name=experiment_name
+
     def _do(self, problem, n_samples, **kwargs):
+        global save_path_controller1
+        global save_path_controller2
+
+        save_path_controller1 = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "controller1")
+        try:
+            os.makedirs(save_path_controller1)
+        except:
+            pass
+            
+        save_path_controller2 = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "controller2")
+        try:
+            os.makedirs(save_path_controller2)
+        except:
+            pass
+
         X = np.full((n_samples, 1), None, dtype=object)
 
         for i in range(n_samples):
-            temp_structure = sample_robot(problem.structure_shape)
+            temp_structure = sample_robot(self.structure_shape)
             while (hashable(temp_structure[0]) in population_structure_hashes):
-                temp_structure = sample_robot(problem.structure_shape)
+                temp_structure = sample_robot(self.structure_shape)
 
-            X[i, 0] = Structure(*temp_structure, i)
+            X[i, 0] = Structure(*temp_structure, unique_label.give_label())
             population_structure_hashes[hashable(temp_structure[0])] = True
 
         return X
@@ -65,13 +129,73 @@ class MyMutation(Mutation):
                 child = mutate(X[i,0].body.copy(), mutation_rate = 0.1, num_attempts=50)
 
             # overwrite structures array w new child
-            X[i,0] = Structure(*child, i)
+            X[i,0] = Structure(*child, unique_label.give_label())
             population_structure_hashes[hashable(child[0])] = True
 
         return X
 
+class MyCallback(Callback):
+        def __init__(self,experiment_name) -> None:
+            super().__init__()
+            self.experiment_name = experiment_name
 
-def run_multi_ga(experiment_name, structure_shape, pop_size, max_evaluations, train_iters, num_cores,env_name1,env_name2):
+        def notify(self, algorithm):
+            global generation
+            global save_path_controller1
+            global save_path_controller2
+            ### MAKE GENERATION DIRECTORIES ###
+            save_path_structure = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "structure")
+            try:
+                os.makedirs(save_path_structure)
+            except:
+                pass
+            
+            structures=algorithm.pop.get("X")
+            structures = sorted(structures, key=lambda structure: structure[0].fitness, reverse=True)
+
+            ### SAVE POPULATION DATA ###
+            for i in range (len(structures)):
+                temp_path = os.path.join(save_path_structure, str(structures[i][0].label))
+                np.savez(temp_path, structures[i][0].body, structures[i][0].connections)
+            
+            #SAVE RANKING TO FILE
+            temp_path = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "output.txt")
+            f = open(temp_path, "w")
+
+            out = ""
+            for structure in structures:
+                out += str(structure[0].label) + "\t\t" + str(structure[0].fitness) + "\t\t" + str(structure[0].fitness2) + "\n"
+            f.write(out)
+            f.close()
+
+            print(f'FINISHED GENERATION {generation}\n')
+            #print(structures[:num_survivors])
+            if generation%5==0:
+                plot = Scatter(title = "Objective Space", labels="f")
+                front=algorithm.pop.get("F")
+                plot.add(-front)
+                temp_path = os.path.join(root_dir, "saved_data", self.experiment_name, "pareto_front_"+str(generation)+".pdf")
+                plot.save(temp_path)
+
+            #make directory for next generation
+            generation+=1
+            save_path_controller1 = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "controller1")
+            try:
+                os.makedirs(save_path_controller1)
+            except:
+                pass
+                
+            save_path_controller2 = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "controller2")
+            try:
+                os.makedirs(save_path_controller2)
+            except:
+                pass
+            unique_label.update_last_label()
+
+
+
+
+def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, train_iters, num_cores,env_name1,env_name2):
     print()
 
     ### STARTUP: MANAGE DIRECTORIES ###
@@ -111,7 +235,7 @@ def run_multi_ga(experiment_name, structure_shape, pop_size, max_evaluations, tr
         f = open(temp_path, "w")
         f.write(f'POP_SIZE: {pop_size}\n')
         f.write(f'STRUCTURE_SHAPE: {structure_shape[0]} {structure_shape[1]}\n')
-        f.write(f'MAX_EVALUATIONS: {max_evaluations}\n')
+        f.write(f'TOTAL_GENERATION: {total_generation}\n')
         f.write(f'TRAIN_ITERS: {train_iters}\n')
         f.write(f'ENV_NAMES1: {env_name1}\n')
         f.write(f'ENV_NAMES2: {env_name2}\n')
@@ -127,109 +251,36 @@ def run_multi_ga(experiment_name, structure_shape, pop_size, max_evaluations, tr
             if count == 1:
                 structure_shape = (int(line.split()[1]), int(line.split()[2]))
             if count == 2:
-                max_evaluations = int(line.split()[1])
+                total_generation = int(line.split()[1])
             if count == 3:
                 train_iters = int(line.split()[1])
                 tc.change_target(train_iters)
             count += 1
 
         print(f'Starting training with pop_size {pop_size}, shape ({structure_shape[0]}, {structure_shape[1]}), ' + 
-            f'max evals: {max_evaluations}, train iters {train_iters}.')
+            f'max evals: {total_generation}, train iters {train_iters}.')
         
         f.close()
 
     #Multiobjective Initialization
-    algorithm=MOEAD(
-        get_reference_directions("das-]dennis", 3, n_partitions=12),
-        n_neighbors=15,
-        prob_neighbor_mating=0.7,
-        sampling=MySampling(),
+    algorithm=NSGA2(
+        pop_size=pop_size,
+        sampling=MySampling(structure_shape,experiment_name),
         mutation=MyMutation(),
-        crossover=MyCrossover()
+        crossover=MyCrossover(),
+        eliminate_duplicates=False
     )
 
-    class ProcessPerGeneration(Callback):
-        def __init__(self) -> None:
-            super().__init__()
-            self.data["best"] = []
+    res = minimize(MyProblem(algorithm,tc,num_cores,env_name1,env_name2),
+                algorithm,
+                ('n_gen',total_generation),
+                seed=1,
+                callback=MyCallback(experiment_name),
+                verbose=False)
 
-        def notify(self, algorithm):
-            ### MAKE GENERATION DIRECTORIES ###
-            save_path_structure = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(algorithm.n_gen), "structure")
-            save_path_controller = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(algorithm.n_gen), "controller")
+    plot = Scatter(title = "Objective Space", labels="f")
+    plot.add(-res.F)
+    temp_path = os.path.join(root_dir, "saved_data", experiment_name, "pareto_front_final.pdf")
+    plot.save(temp_path)
+
         
-            try:
-                os.makedirs(save_path_structure)
-            except:
-                pass
-
-            try:
-                os.makedirs(save_path_controller)
-            except:
-                pass
-
-        ### SAVE POPULATION DATA ###
-        for i in range (len(structures)):
-            temp_path = os.path.join(save_path_structure, str(structures[i].label))
-            np.savez(temp_path, structures[i].body, structures[i].connections)
-
-        ### TRAIN GENERATION
-
-        #better parallel
-        group = mp.Group()
-        for structure in structures:
-
-            if structure.is_survivor:
-                save_path_controller_part = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation), "controller",
-                    "robot_" + str(structure.label) + "_controller" + ".pt")
-                save_path_controller_part_old = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation-1), "controller",
-                    "robot_" + str(structure.prev_gen_label) + "_controller" + ".pt")
-                
-                print(f'Skipping training for {save_path_controller_part}.\n')
-                try:
-                    shutil.copy(save_path_controller_part_old, save_path_controller_part)
-                except:
-                    print(f'Error coppying controller for {save_path_controller_part}.\n')
-            else:        
-                ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label))
-                group.add_job(run_ppo, ppo_args, callback=structure.set_reward)
-
-        group.run_jobs(num_cores)
-
-        #not parallel
-        #for structure in structures:
-        #    ppo.run_algo(structure=(structure.body, structure.connections), termination_condition=termination_condition, saving_convention=(save_path_controller, structure.label))
-
-        ### COMPUTE FITNESS, SORT, AND SAVE ###
-        for structure in structures:
-            structure.compute_fitness()
-
-        structures = sorted(structures, key=lambda structure: structure.fitness, reverse=True)
-
-        #SAVE RANKING TO FILE
-        temp_path = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation), "output.txt")
-        f = open(temp_path, "w")
-
-        out = ""
-        for structure in structures:
-            out += str(structure.label) + "\t\t" + str(structure.fitness) + "\n"
-        f.write(out)
-        f.close()
-
-         ### CHECK EARLY TERMINATION ###
-        if num_evaluations == max_evaluations:
-            print(f'Trained exactly {num_evaluations} robots')
-            return
-
-        print(f'FINISHED GENERATION {generation} - SEE TOP {round(percent_survival*100)} percent of DESIGNS:\n')
-        print(structures[:num_survivors])
-
-        ### CROSSOVER AND MUTATION ###
-        # save the survivors
-        survivors = structures[:num_survivors]
-
-        #store survivior information to prevent retraining robots
-        for i in range(num_survivors):
-            structures[i].is_survivor = True 
-            structures[i].prev_gen_label = structures[i].label
-            structures[i].label = i

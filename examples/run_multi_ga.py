@@ -9,14 +9,16 @@ if __name__ == "__main__":
     seed = 0
     random.seed(seed)
     np.random.seed(seed)
+    env_name1="Climber-v0"
+    env_name2="Climber-v1"
     
     run_multi_ga(
-        pop_size = 10,
+        pop_size = 40,
         structure_shape = (5,5),
-        experiment_name = "test_ga",
-        max_evaluations = 100,
-        train_iters = 50,
-        num_cores = 3,
-        env_name1="BridgeWalker-v0",
-        env_name2="Walker-v0"
+        experiment_name = env_name1+"_"+env_name2+"_"+'debug',
+        total_generation = 100,
+        train_iters =50,
+        num_cores =8,
+        env_name1=env_name1,
+        env_name2=env_name2
     )
