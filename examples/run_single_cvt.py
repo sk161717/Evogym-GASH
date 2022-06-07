@@ -22,7 +22,7 @@ if __name__ == "__main__":
         train_iters =50,
         num_cores = 8,
         env_name=env_name,
-        n_samples=32,
+        n_samples=8,
         batch_size=16,
         p_mut=1.0,
         dim_map=2,
