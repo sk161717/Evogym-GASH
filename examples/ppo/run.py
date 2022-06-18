@@ -5,6 +5,11 @@ import numpy as np
 import time
 from collections import deque
 import torch
+from torch.multiprocessing import set_start_method
+try:
+     set_start_method('spawn')
+except RuntimeError:
+    pass
 
 from ppo import utils
 from ppo.arguments import get_args

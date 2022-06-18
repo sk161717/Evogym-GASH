@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 #元のコード、保存しておく
-#| This file is a part of the pymap_elites framework.
+#| This file is a part of the pyME framework.
 #| Copyright 2019, INRIA
 #| Main contributor(s):
 #| Jean-Baptiste Mouret, jean-baptiste.mouret@inria.fr
@@ -45,7 +45,7 @@ import multiprocessing
 # from scipy.spatial import cKDTree : TODO -- faster?
 from sklearn.neighbors import KDTree
 
-from pymap_elites.map_elites import common as cm
+from pyME.map_elites import common as cm
 
 
 

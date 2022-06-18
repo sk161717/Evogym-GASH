@@ -11,12 +11,20 @@ external_dir = os.path.join(root_dir, 'externals')
 sys.path.insert(0, root_dir)
 sys.path.insert(1, os.path.join(external_dir, 'pytorch_a2c_ppo_acktr_gail'))
 
+from pyME.map_elites.single_cvt import __add_to_archive
+from pyME.map_elites import common as cm
+from sklearn.neighbors import KDTree
 from ppo import run_ppo
 from evogym import sample_robot, hashable
 import utils.mp_group as mp
-from utils.algo_utils import get_percent_survival_evals, mutate, TerminationCondition, Structure
+from utils.algo_utils import get_percent_survival_evals, mutate, TerminationCondition, Structure,save_archive,load_archive
 
-def run_ga(experiment_name, structure_shape, pop_size, max_evaluations, train_iters, num_cores):
+def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
+        env_name,
+        dim_map,
+        n_niches, 
+        max_evaluations, 
+        params=cm.default_params,):
     print()
 
     ### STARTUP: MANAGE DIRECTORIES ###
@@ -86,6 +94,11 @@ def run_ga(experiment_name, structure_shape, pop_size, max_evaluations, train_it
     population_structure_hashes = {}
     num_evaluations = 0
     generation = 0
+    archive = {}  # init archive (empty)
+
+    c = cm.cvt(n_niches, dim_map,
+               params['cvt_samples'], params['cvt_use_cache'])
+    kdt = KDTree(c, leaf_size=30, metric='euclidean')
     
     #generate a population
     if not is_continuing: 
@@ -115,6 +128,7 @@ def run_ga(experiment_name, structure_shape, pop_size, max_evaluations, train_it
                     structures.append(Structure(*structure_data, i))
         num_evaluations = len(list(population_structure_hashes.keys()))
         generation = start_gen
+        archive=load_archive(generation,experiment_name)
 
 
     while True:
@@ -161,7 +175,7 @@ def run_ga(experiment_name, structure_shape, pop_size, max_evaluations, train_it
                 except:
                     print(f'Error coppying controller for {save_path_controller_part}.\n')
             else:        
-                ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label))
+                ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name)
                 group.add_job(run_ppo, ppo_args, callback=structure.set_reward)
 
         group.run_jobs(num_cores)
@@ -173,6 +187,10 @@ def run_ga(experiment_name, structure_shape, pop_size, max_evaluations, train_it
         ### COMPUTE FITNESS, SORT, AND SAVE ###
         for structure in structures:
             structure.compute_fitness()
+            structure.desc=cm.calc_desc(structure.body)
+            __add_to_archive(structure, structure.desc, archive, kdt)
+        
+        save_archive(archive,generation,experiment_name)
 
         structures = sorted(structures, key=lambda structure: structure.fitness, reverse=True)
 
@@ -183,8 +201,11 @@ def run_ga(experiment_name, structure_shape, pop_size, max_evaluations, train_it
         out = ""
         for structure in structures:
             out += str(structure.label) + "\t\t" + str(structure.fitness) + "\n"
+        out+="current evaluation: "+str(num_evaluations)+"\n"
         f.write(out)
         f.close()
+
+        cm.save_centroid_and_map(root_dir,experiment_name,generation,archive,n_niches)
 
          ### CHECK EARLY TERMINATION ###
         if num_evaluations == max_evaluations:

@@ -11,13 +11,14 @@ sys.path.insert(0, root_dir)
 sys.path.insert(1, os.path.join(external_dir, 'pytorch_a2c_ppo_acktr_gail'))
 from sklearn.neighbors import KDTree
 
-from pymap_elites.map_elites import common as cm
-from utils.algo_utils import mutate, TerminationCondition, Structure, UniqueLabel
+from pyME.map_elites import common as cm
+from utils.algo_utils import mutate, TerminationCondition, Structure, UniqueLabel,save_polulation_hashes,load_population_hashes,save_archive,load_archive,calc_curr_evaluation
 from evogym import sample_robot, hashable
 from ppo import run_ppo
 import utils.mp_group as mp
+from make_gifs import Job
 
-population_structure_hashes = {}
+
 unique_label = UniqueLabel()
 
 
@@ -70,18 +71,21 @@ def make_save_path(expr_name, generation):
 
 
 # map-elites algorithm (CVT variant)
-def run_single_ME(experiment_name, structure_shape, total_generation,
+def run_single_ME(experiment_name, structure_shape,
             train_iters, num_cores, env_name, n_samples, batch_size, p_mut,
             dim_map,
             n_niches,
             params=cm.default_params,
-            max_eval=10000):
+            max_eval=10000,
+            produce_gif=False):
     """CVT MAP-Elites
        Vassiliades V, Chatzilygeroudis K, Mouret JB. Using centroidal voronoi tessellations to scale up the multidimensional archive of phenotypic elites algorithm. IEEE Transactions on Evolutionary Computation. 2017 Aug 3;22(4):623-30.
 
        Format of the logfile: evals archive_size max mean median 5%_percentile, 95%_percentile
 
     """
+    population_structure_hashes = {}
+
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
     start_gen = 0
@@ -117,11 +121,33 @@ def run_single_ME(experiment_name, structure_shape, total_generation,
             pass
 
         f = open(temp_path, "w")
-        f.write(f'NICHE SIZE: {n_niches}\n')
+        f.write(f'NICHE_SIZE: {n_niches}\n')
         f.write(f'STRUCTURE_SHAPE: {structure_shape[0]} {structure_shape[1]}\n')
-        f.write(f'TOTAL_GENERATION: {total_generation}\n')
+        f.write(f'TOTAL_EVALUATION: {max_eval}\n')
         f.write(f'TRAIN_ITERS: {train_iters}\n')
         f.write(f'ENV_NAMES: {env_name}\n')
+        f.close()
+    else:
+        temp_path = os.path.join(root_dir, "saved_data", experiment_name, "metadata.txt")
+        f = open(temp_path, "r")
+        count = 0
+        for line in f:
+            if count == 0:
+                n_niches = int(line.split()[1])
+            if count == 1:
+                structure_shape = (int(line.split()[1]), int(line.split()[2]))
+            if count == 2:
+                max_evaluations = int(line.split()[1])
+            if count == 3:
+                train_iters = int(line.split()[1])
+                tc.change_target(train_iters)
+            if count == 4:
+                env_name=line.split()[1]
+            count += 1
+
+        print(f'Starting training with niche size {n_niches}, shape ({structure_shape[0]}, {structure_shape[1]}), ' + 
+            f'max evals: {max_evaluations}, train iters {train_iters}, env name {env_name}.')
+        
         f.close()
 
     # setup the parallel processing pool
@@ -133,13 +159,11 @@ def run_single_ME(experiment_name, structure_shape, total_generation,
     kdt = KDTree(c, leaf_size=30, metric='euclidean')
 
     archive = {}  # init archive (empty)
-    generation = 0  # number of evaluations since the beginning
+    generation = start_gen  # number of evaluations since the beginning
     curr_evaluation=0
-    b_generation = 0  # number evaluation since the last dump
 
     # main loop
     while (curr_evaluation < max_eval):
-        save_path_controller = make_save_path(experiment_name, generation)
         # random initialization
         if generation == 0:
             # initialize robot
@@ -155,6 +179,13 @@ def run_single_ME(experiment_name, structure_shape, total_generation,
                 population_structure_hashes[hashable(temp_structure[0])] = True
 
         else:  # variation/selection loop
+            # section for resuming learning
+            if is_continuing==True:
+                archive=load_archive(generation,experiment_name)
+                population_structure_hashes=load_population_hashes(generation,experiment_name)
+                curr_evaluation=calc_curr_evaluation(generation,n_samples,batch_size)
+                unique_label.set_label_start_for_resuming(curr_evaluation)
+                is_continuing=False
             keys = list(archive.keys())
             n_mut = int(batch_size * p_mut)
             n_cross = int(batch_size * (1 - p_mut))
@@ -195,11 +226,21 @@ def run_single_ME(experiment_name, structure_shape, total_generation,
                 population_structure_hashes[hashable(child[0])] = True
 
             print("n_mut",n_mut,"\n n_cross",n_cross,"\n X",X)
+
+        
+        
+        
+
+        save_path_controller = make_save_path(experiment_name, generation)
         # evaluation of the fitness for to_evaluate
         myProblem._evaluate(X, save_path_controller)
         # natural selection
         for x in X:
             __add_to_archive(x, x.desc, archive, kdt)
+        
+        
+
+        
 
         ######################save data per generation##########################
 
@@ -209,6 +250,10 @@ def run_single_ME(experiment_name, structure_shape, total_generation,
             os.makedirs(save_path_structure)
         except:
             pass
+
+        #save population hash for resuming training
+        save_polulation_hashes(population_structure_hashes,generation,experiment_name)
+        save_archive(archive,generation,experiment_name)
 
         structures = [structure for structure in archive.values()]
         structures = sorted(structures, key=lambda structure: structure.fitness, reverse=True)
@@ -229,19 +274,29 @@ def run_single_ME(experiment_name, structure_shape, total_generation,
         f.write(out)
         f.close()
 
-        if b_generation%1==0:
-            temp_path = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation), "centroid_score.txt")
-            f = open(temp_path, "w")
+        
+        cm.save_centroid_and_map(root_dir,experiment_name,generation,archive,n_niches)
+        
+        if produce_gif==True and generation%10==0:
+            exp_root = os.path.join(root_dir,'saved_data')
+            save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
 
-            out = ""
-            for key in archive:
-                out += str(key[0]) + "\t\t" + str(key[1]) + "\t\t" + str(archive[key].fitness) + "\n"
-            f.write(out)
-            f.close()
-            cm.draw_voronoi_map(n_niches,experiment_name,generation)
+            my_job = Job(
+            name = experiment_name,
+            experiment_names= [experiment_name],
+            env_names = [env_name],
+            load_dir = exp_root,
+            generations=[generation],
+            population_size=batch_size,
+            use_cells=True,
+            organize_by_experiment=False,
+            organize_by_generation=True,
+            )
+
+            my_job.generate(load_dir=exp_root, save_dir=save_dir)
 
         print(f'FINISHED GENERATION {generation}\n')
 
         ### update generation ###
         generation += 1
-        b_generation += 1
+       
