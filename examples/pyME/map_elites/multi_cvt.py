@@ -11,7 +11,7 @@ sys.path.insert(0, root_dir)
 sys.path.insert(1, os.path.join(external_dir, 'pytorch_a2c_ppo_acktr_gail'))
 from sklearn.neighbors import KDTree
 
-from pymap_elites.map_elites import common as cm
+from pyME.map_elites import common as cm
 from utils.algo_utils import mutate, TerminationCondition, Structure, UniqueLabel
 from evogym import sample_robot, hashable
 from ppo import run_ppo

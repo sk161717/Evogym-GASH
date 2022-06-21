@@ -1,6 +1,9 @@
 import math
-from os import name
+import sys,os
 from evogym import is_connected, has_actuator, get_full_connectivity, draw, get_uniform
+import pickle
+curr_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.join(curr_dir, '..')
 
 class Structure():
 
@@ -188,6 +191,41 @@ class UniqueLabel():
     
     def update_last_label(self):
         self.prev_gen_last_label=self.label
+    
+    def set_label_start_for_resuming(self,start_label):
+        self.label=start_label-1
+
+def save_polulation_hashes(hash_dict,gen,experiment_name):
+    print('population structure hash length : '+str(len(hash_dict)))
+    save_path=os.path.join(root_dir,'saved_data', experiment_name, "generation_" + str(gen),'population_structure_hashes.pkl')
+    with open(save_path,'wb') as f:
+        pickle.dump(hash_dict,f)
+
+def load_population_hashes(gen,experiment_name):
+    open_path=os.path.join(root_dir,'saved_data',experiment_name,"generation_" + str(gen-1),'population_structure_hashes.pkl')
+    with open(open_path,'rb') as f:
+        hash_dict=pickle.load(f)
+    return hash_dict
+
+def save_archive(archive,gen,experiment_name):
+    save_path=os.path.join(root_dir,'saved_data', experiment_name, "generation_" + str(gen),'archive.pkl')
+    with open(save_path,'wb') as f:
+        pickle.dump(archive,f)
+
+def load_archive(gen,experiment_name):
+    open_path=os.path.join(root_dir,'saved_data',experiment_name,"generation_" + str(gen-1),'archive.pkl')
+    with open(open_path,'rb') as f:
+        archive=pickle.load(f)
+    return archive
+
+def calc_curr_evaluation(gen,n_samples,batch_size):
+    curr_eval=0
+    for i in range(gen):
+        if i==0:
+            curr_eval+=n_samples
+        else:
+            curr_eval+=batch_size
+    return curr_eval
 
 if __name__ == "__main__":
 

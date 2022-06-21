@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-#| This file is a part of the pymap_elites framework.
+#| This file is a part of the pyME framework.
 #| Copyright 2019, INRIA
 #| Main contributor(s):
 #| Jean-Baptiste Mouret, jean-baptiste.mouret@inria.fr

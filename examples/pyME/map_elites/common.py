@@ -13,7 +13,7 @@ from scipy.spatial import Voronoi, voronoi_plot_2d
 from shapely.geometry import Polygon
 from sympy.geometry import Point
 from sympy.geometry import Polygon as SymPoly
-from pymap_elites.map_elites import common as cm
+from pyME.map_elites import common as cm
 
 #path info
 curr_dir = os.path.dirname(os.path.abspath(__file__))
@@ -373,9 +373,9 @@ def draw_voronoi_map(n_niches,experiment_name,generation):
     
     with open(path) as f:
         lines=[line.split('\t\t') for line in f.readlines()]
-        centroids_gene_exist=np.array(lines)[:,:2]
+        centroids_gene_exist=np.array(lines)[:,1:3]
         centroids_gene_exist=centroids_gene_exist.astype("float")
-        scores=np.array(lines)[:,2:].T[0]
+        scores=np.array(lines)[:,3:].T[0]
         for centroid,score in zip(centroids_gene_exist,scores):
             score_float=float(score.split('\n')[0])
             score_float=score_float if score_float > 0 else 0
@@ -388,5 +388,14 @@ def draw_voronoi_map(n_niches,experiment_name,generation):
     # ボロノイ図の計算・描画
     bounded_voronoi(bnd, centroids,centroid_score_dict,max_score,min_score,n_niches,experiment_name,generation)
     
+def save_centroid_and_map(root_dir,experiment_name,generation,archive,n_niches):
+    temp_path = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation), "centroid_score.txt")
+    f = open(temp_path, "w")
 
+    out = ""
+    for key in archive:
+        out += str(archive[key].label) + "\t\t" + str(key[0]) + "\t\t" + str(key[1]) + "\t\t" + str(archive[key].fitness) + "\n"
+    f.write(out)
+    f.close()
+    draw_voronoi_map(n_niches,experiment_name,generation)
 

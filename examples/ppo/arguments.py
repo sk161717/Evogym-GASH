@@ -138,7 +138,7 @@ def get_args():
     parser.add_argument(
         '--no-cuda',
         action='store_true',
-        default=False,
+        default=True,
         help='disables CUDA training')
     parser.add_argument(
         '--use-proper-time-limits',

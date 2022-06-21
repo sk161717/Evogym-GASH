@@ -3,8 +3,7 @@ import numpy as np
 import torch
 import gym
 from PIL import Image
-import imageio
-from pygifsicle import optimize
+
 
 import os, sys
 root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -13,104 +12,11 @@ sys.path.insert(0, root_dir)
 sys.path.insert(1, os.path.join(external_dir, 'pytorch_a2c_ppo_acktr_gail'))
 
 from utils.algo_utils import *
-from ppo.envs import make_vec_envs
-from ppo.utils import get_vec_normalize
 import utils.mp_group as mp
-
-def get_exp_gen_data(exp_name, load_dir, gen):
-    robot_data = []
-    gen_data_path = os.path.join(load_dir, exp_name, f"generation_{gen}", "output.txt")
-    f = open(gen_data_path, "r")
-    for line in f:
-        robot_data.append((int(line.split()[0]), float(line.split()[1]),float(line.split()[2])))
-    return robot_data
+from gif_utils import *
 
 def dummy_callback(_):
     pass
-
-def save_robot_gif(out_path, env_name, body_path, ctrl_path):
-    global GIF_RESOLUTION
-
-    structure_data = np.load(body_path)
-    structure = []
-    for key, value in structure_data.items():
-        structure.append(value)
-    structure = tuple(structure)
-
-    env = make_vec_envs(env_name, structure, 1000, 1, None, None, device='cpu', allow_early_resets=False)
-    env.get_attr("default_viewer", indices=None)[0].set_resolution(GIF_RESOLUTION)
-                    
-    actor_critic, obs_rms = torch.load(ctrl_path, map_location='cpu')
-
-    vec_norm = get_vec_normalize(env)
-    if vec_norm is not None:
-        vec_norm.eval()
-        vec_norm.obs_rms = obs_rms
-
-    recurrent_hidden_states = torch.zeros(1, actor_critic.recurrent_hidden_state_size)
-    masks = torch.zeros(1, 1)
-
-    obs = env.reset()
-    img = env.render(mode='img')
-    reward = None
-    done = False
-
-    imgs = []
-    # arrays = []
-    while not done:
-
-        with torch.no_grad():
-            value, action, _, recurrent_hidden_states = actor_critic.act(
-                obs, recurrent_hidden_states, masks, deterministic=True)
-
-        obs, reward, done, _ = env.step(action)
-        img = env.render(mode='img')
-        imgs.append(img)
-
-        masks.fill_(0.0 if (done) else 1.0)
-
-        if done == True:
-            env.reset()
-
-    env.close()
-
-    imageio.mimsave(f'{out_path}.gif', imgs, duration=(1/50.0))
-    try:
-        optimize(out_path)
-    except:
-        pass
-        # print("Error optimizing gif. Most likely cause is that gifsicle is not installed.")
-    return 0
-
-class Robot():
-    def __init__(
-        self, 
-        body_path=None, 
-        ctrl_path=None, 
-        reward=None, 
-        env_name=None, 
-        exp_name=None, 
-        gen=None):
-        self.body_path = body_path
-        self.ctrl_path = ctrl_path
-        self.reward = reward
-        self.env_name = env_name
-        self.exp_name = exp_name
-        self.gen = gen
-    def __str__(self):
-        exp_str = f'{self.exp_name}' if self.exp_name is not None else ''
-        gen_str = f'gen{self.gen}' if self.gen is not None else ''
-        reward_str = f'({round(self.reward, 3)})' if self.reward is not None else ''
-        comps = [exp_str, gen_str, reward_str]
-        out = ''
-        for comp in comps:
-            if len(comp) != 0:
-                out += f'{comp}_'
-        return out[:-1]
-
-def load_dir_calc(pop_size,idx):
-    return math.floor(idx/pop_size)
-    
 
 class Job():
     def __init__(
@@ -123,6 +29,7 @@ class Job():
         population_size=None,
         ranks=None,
         jobs=None,
+        use_cells=False,
         organize_by_jobs=True,
         organize_by_experiment=False,
         organize_by_generation=False):
@@ -135,6 +42,7 @@ class Job():
         self.generations = generations
         self.population_size = population_size
         self.ranks = ranks
+        self.use_cells=use_cells
 
         # set jobs 
         self.sub_jobs = []
@@ -173,6 +81,7 @@ class Job():
                     generations = [gen],
                     population_size=self.population_size,
                     ranks = self.ranks,
+                    use_cells=self.use_cells,
                     organize_by_experiment=False,
                     organize_by_generation=False
                 ))
@@ -203,8 +112,9 @@ class Job():
         for exp_name in self.experiment_names:
             exp_gens = self.generations
             for gen in exp_gens:
-                for idx, reward1,reward2 in get_exp_gen_data(exp_name, load_dir, gen):
-
+                id_centroid_dict=make_id_centroid_dict(exp_name, load_dir, gen)
+                for idx, reward1,reward2 in get_exp_gen_data(exp_name, load_dir, gen,is_multi=True):
+                    cent_x,cent_y=id_to_centroid(id_centroid_dict,self.use_cells,idx)
                     robots1.append(Robot(
                         body_path = os.path.join(load_dir, exp_name, f"generation_{gen}", "structure", f"{idx}.npz"),
                         ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx)}", "controller1", f"robot_{idx}_controller.pt"),
@@ -220,6 +130,7 @@ class Job():
                         env_name = self.env_names[1],
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
                         gen = gen ,
+                        cent=(cent_x,cent_y),
                     ))
 
         # sort and generate
@@ -229,35 +140,24 @@ class Job():
         
         # make gifs
         for i, robot in zip(ranks, robots1):
+            cent_info= '' if robot.cent==(None,None) else 'x='+str(robot.cent[0])+', y='+str(robot.cent[1])
             save_robot_gif(
-                os.path.join(save_dir, f'{self.env_names[0]}_{i}_{robot}'),
+                os.path.join(save_dir, f'{self.env_names[0]}_{i}_{robot}_{cent_info}'),
                 robot.env_name,
                 robot.body_path,
                 robot.ctrl_path
             )
         
         for i, robot in zip(ranks, robots2):
+            cent_info= '' if robot.cent==(None,None) else 'x='+str(robot.cent[0])+', y='+str(robot.cent[1])
             save_robot_gif(
-                os.path.join(save_dir, f'{self.env_names[1]}_{i}_{robot}'),
+                os.path.join(save_dir, f'{self.env_names[1]}_{i}_{robot}_{cent_info}'),
                 robot.env_name,
                 robot.body_path,
                 robot.ctrl_path
             )
-
-        # multiprocessing is currently broken
-        
-        # group = mp.Group()
-        # for i, robot in zip(ranks, robots):              
-        #     gif_args = (
-        #         os.path.join(save_dir, f'{i}_{robot}'),
-        #         robot.env_name,
-        #         robot.body_path,
-        #         robot.ctrl_path
-        #     )
-        #     group.add_job(save_robot_gif, gif_args, callback=dummy_callback)
-        # group.run_jobs(NUM_PROC)
     
-GIF_RESOLUTION = (1280/5, 720/5)
+
 # NUM_PROC = 8
 if __name__ == '__main__':
     exp_root = os.path.join('saved_data')

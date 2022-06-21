@@ -2,8 +2,8 @@ import random
 import numpy as np
 import torch
 
-from pymap_elites.map_elites.multi_cvt import run_MOME
-import pymap_elites.map_elites.common as cm_map_elites
+from pyME.map_elites.multi_cvt import run_MOME
+import pyME.map_elites.common as cm_map_elites
 
 from ppo.arguments import get_args
 
