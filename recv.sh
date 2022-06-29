@@ -1,1 +1,1 @@
-rsync -azvhP katayama@server4:~/workspace/evogym/ ~/katayama/evogym/
+rsync -azvhP katayama@server$1:~/workspace/evogym/examples/saved_data/ ~/katayama/evogym/examples/saved_data/

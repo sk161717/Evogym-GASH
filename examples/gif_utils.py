@@ -8,7 +8,9 @@ import numpy as np
 
 GIF_RESOLUTION = (1280/5, 720/5)
 
-def make_id_centroid_dict(exp_name, load_dir, gen):
+def make_id_centroid_dict(exp_name, load_dir, gen,use_cells):
+    if use_cells!=True:
+        return None
     id_centroid_dict={}
     gen_data_path = os.path.join(load_dir, exp_name, f"generation_{gen}", "centroid_score.txt")
     with open(gen_data_path,'r') as f:
@@ -98,8 +100,12 @@ def get_exp_gen_data(exp_name, load_dir, gen,is_multi=False):
     return robot_data
 
 
-def load_dir_calc(pop_size,idx):
-    return math.floor(idx/pop_size)
+def load_dir_calc(pop_size,idx,use_cells,gen):
+    if use_cells:
+        return math.floor(idx/pop_size)
+    else:
+        return gen
+    
 
 # automatically get generation list from folder
 def get_generations(load_dir, exp_name):

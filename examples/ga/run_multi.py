@@ -14,11 +14,12 @@ population_structure_hashes = {}
 generation=0
 save_path_controller1=None
 save_path_controller2=None
+curr_evaluation=0
 
 from ppo import run_ppo
 from evogym import sample_robot, hashable
 import utils.mp_group as mp
-from utils.algo_utils import mutate, TerminationCondition, Structure,UniqueLabel
+from utils.algo_utils import mutate, TerminationCondition, Structure,UniqueLabel,save_polulation_hashes
 from make_gifs_multi import Job
 from pymoo.core.sampling import Sampling
 from pymoo.core.crossover import Crossover
@@ -50,6 +51,8 @@ class MyProblem(Problem):
         out["F"] = np.column_stack([fitness1, fitness2])
     
     def RunOneEnv(self,X,env_name,save_path_controller,env_index):
+        global curr_evaluation
+
         group = mp.Group()
         for x in X:
             ppo_args = ((x[0].body, x[0].connections), self.tc, (save_path_controller, x[0].label),env_name)
@@ -57,6 +60,7 @@ class MyProblem(Problem):
                 group.add_job(run_ppo, ppo_args, callback=x[0].set_reward)
             elif env_index==2:
                 group.add_job(run_ppo, ppo_args, callback=x[0].set_reward2)
+            curr_evaluation+=1
         group.run_jobs(self.num_cores)
 
         ### COMPUTE FITNESS, SORT, AND SAVE ###
@@ -72,10 +76,11 @@ class MyProblem(Problem):
 
 
 class MySampling(Sampling):
-    def __init__(self,structure_shape,experiment_name):
+    def __init__(self,structure_shape,experiment_name,is_continuing=False):
         super().__init__()
         self.structure_shape=structure_shape
         self.experiment_name=experiment_name
+        self.is_continuing=is_continuing
 
     def _do(self, problem, n_samples, **kwargs):
         global save_path_controller1
@@ -143,12 +148,16 @@ class MyCallback(Callback):
             global generation
             global save_path_controller1
             global save_path_controller2
+            global curr_evaluation
+            
             ### MAKE GENERATION DIRECTORIES ###
             save_path_structure = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "structure")
             try:
                 os.makedirs(save_path_structure)
             except:
                 pass
+
+            save_polulation_hashes(population_structure_hashes,generation,self.experiment_name)
             
             structures=algorithm.pop.get("X")
             structures = sorted(structures, key=lambda structure: structure[0].fitness, reverse=True)
@@ -165,17 +174,18 @@ class MyCallback(Callback):
             out = ""
             for structure in structures:
                 out += str(structure[0].label) + "\t\t" + str(structure[0].fitness) + "\t\t" + str(structure[0].fitness2) + "\n"
+            out+="current evaluation: "+str(curr_evaluation)+"\n"
             f.write(out)
             f.close()
 
             print(f'FINISHED GENERATION {generation}\n')
-            #print(structures[:num_survivors])
-            if generation%5==0:
-                plot = Scatter(title = "Objective Space", labels="f")
-                front=algorithm.pop.get("F")
-                plot.add(-front)
-                temp_path = os.path.join(root_dir, "saved_data", self.experiment_name, "pareto_front_"+str(generation)+".pdf")
-                plot.save(temp_path)
+           
+            # plot pareto front
+            plot = Scatter(title = "Objective Space", labels="f")
+            front=algorithm.pop.get("F")
+            plot.add(-front)
+            temp_path = os.path.join(root_dir, "saved_data", self.experiment_name,"generation_" + str(generation), "pareto_front.pdf")
+            plot.save(temp_path)
 
             #make directory for next generation
             generation+=1
@@ -195,9 +205,7 @@ class MyCallback(Callback):
 
 
 
-def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, train_iters, num_cores,env_name1,env_name2):
-    print()
-
+def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, train_iters, num_cores,env_name1,env_name2,seed=0):
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
     start_gen = 0
@@ -258,7 +266,7 @@ def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, t
             count += 1
 
         print(f'Starting training with pop_size {pop_size}, shape ({structure_shape[0]}, {structure_shape[1]}), ' + 
-            f'max evals: {total_generation}, train iters {train_iters}.')
+            f'max generation: {total_generation}, train iters {train_iters}.')
         
         f.close()
 
@@ -274,7 +282,7 @@ def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, t
     res = minimize(MyProblem(algorithm,tc,num_cores,env_name1,env_name2),
                 algorithm,
                 ('n_gen',total_generation),
-                seed=1,
+                seed=seed,
                 callback=MyCallback(experiment_name),
                 verbose=False)
 

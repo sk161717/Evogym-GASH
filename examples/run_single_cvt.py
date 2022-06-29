@@ -12,20 +12,20 @@ if __name__ == "__main__":
     seed = 0
     random.seed(seed)
     np.random.seed(seed)
-    env_name="Thrower-v0"
+    env_name="PlatformJumper-v0"
     batch_size=16
 
     run_single_ME(
         experiment_name = env_name+"_ME",  
         structure_shape = (5,5),
         train_iters =1000,
-        num_cores = 8,
+        num_cores = 4,
         env_name=env_name,
         n_samples=batch_size,
         batch_size=batch_size,
         p_mut=1.0,
         dim_map=2,
         n_niches=128,
-        max_eval=10000,
+        max_eval=1000000,
         produce_gif=False)
 

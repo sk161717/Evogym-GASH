@@ -225,7 +225,7 @@ def run_single_ME(experiment_name, structure_shape,
                 X[i] = Structure(*child, unique_label.give_label())
                 population_structure_hashes[hashable(child[0])] = True
 
-            print("n_mut",n_mut,"\n n_cross",n_cross,"\n X",X)
+            print("n_mut",n_mut,"\n n_cross",n_cross,"\n")
 
         
         

@@ -1,3 +1,4 @@
+from json import load
 import os
 import numpy as np
 import shutil
@@ -17,15 +18,17 @@ from sklearn.neighbors import KDTree
 from ppo import run_ppo
 from evogym import sample_robot, hashable
 import utils.mp_group as mp
-from utils.algo_utils import get_percent_survival_evals, mutate, TerminationCondition, Structure,save_archive,load_archive
+from utils.algo_utils import get_percent_survival_evals, mutate, TerminationCondition, Structure,save_archive,load_archive,load_evaluation
 
 def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         env_name,
         dim_map,
         n_niches, 
         max_evaluations, 
-        params=cm.default_params,):
-    print()
+        params=cm.default_params,
+        is_transfer=False,
+        transfer_expr_name=None,
+        transfer_gen=None,):
 
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
@@ -101,16 +104,28 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
     kdt = KDTree(c, leaf_size=30, metric='euclidean')
     
     #generate a population
-    if not is_continuing: 
-        for i in range (pop_size):
-            
-            temp_structure = sample_robot(structure_shape)
-            while (hashable(temp_structure[0]) in population_structure_hashes):
+    if not is_continuing:
+        if is_transfer==False: 
+            for i in range (pop_size):
+                
                 temp_structure = sample_robot(structure_shape)
+                while (hashable(temp_structure[0]) in population_structure_hashes):
+                    temp_structure = sample_robot(structure_shape)
 
-            structures.append(Structure(*temp_structure, i))
-            population_structure_hashes[hashable(temp_structure[0])] = True
-            num_evaluations += 1
+                structures.append(Structure(*temp_structure, i))
+                population_structure_hashes[hashable(temp_structure[0])] = True
+                num_evaluations += 1
+        else:
+            for i in range(pop_size):
+                save_path_structure = os.path.join(root_dir, "saved_data", transfer_expr_name, "generation_" + str(transfer_gen), "structure", str(i) + ".npz")
+                np_data = np.load(save_path_structure)
+                structure_data = []
+                for key, value in np_data.items():
+                    structure_data.append(value)
+                structure_data = tuple(structure_data)
+                population_structure_hashes[hashable(structure_data[0])] = True
+                structures.append(Structure(*structure_data, i))
+            num_evaluations=load_evaluation(transfer_expr_name,transfer_gen)
 
     #read status from file
     else:
@@ -129,7 +144,6 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         num_evaluations = len(list(population_structure_hashes.keys()))
         generation = start_gen
         archive=load_archive(generation,experiment_name)
-
 
     while True:
 
@@ -213,7 +227,6 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
             return
 
         print(f'FINISHED GENERATION {generation} - SEE TOP {round(percent_survival*100)} percent of DESIGNS:\n')
-        print(structures[:num_survivors])
 
         ### CROSSOVER AND MUTATION ###
         # save the survivors

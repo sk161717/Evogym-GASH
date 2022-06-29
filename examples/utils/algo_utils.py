@@ -226,6 +226,15 @@ def calc_curr_evaluation(gen,n_samples,batch_size):
         else:
             curr_eval+=batch_size
     return curr_eval
+def load_evaluation(expr_name,gen):
+    outputTXT_path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'output.txt')
+    with open(outputTXT_path,'r') as f:
+        for line in f:
+            pass
+        last_line = line
+    curr_evaluation=int(line.split()[2])
+    return curr_evaluation
+
 
 if __name__ == "__main__":
 

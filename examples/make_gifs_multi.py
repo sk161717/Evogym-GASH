@@ -112,20 +112,21 @@ class Job():
         for exp_name in self.experiment_names:
             exp_gens = self.generations
             for gen in exp_gens:
-                id_centroid_dict=make_id_centroid_dict(exp_name, load_dir, gen)
+                id_centroid_dict=make_id_centroid_dict(exp_name, load_dir, gen,self.use_cells)
                 for idx, reward1,reward2 in get_exp_gen_data(exp_name, load_dir, gen,is_multi=True):
                     cent_x,cent_y=id_to_centroid(id_centroid_dict,self.use_cells,idx)
                     robots1.append(Robot(
                         body_path = os.path.join(load_dir, exp_name, f"generation_{gen}", "structure", f"{idx}.npz"),
-                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx)}", "controller1", f"robot_{idx}_controller.pt"),
+                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,True,gen)}", "controller1", f"robot_{idx}_controller.pt"),
                         reward = reward1,
                         env_name = self.env_names[0],
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
                         gen = gen,
+                        cent=(cent_x,cent_y),
                     ))
                     robots2.append(Robot(
                         body_path = os.path.join(load_dir, exp_name, f"generation_{gen}", "structure", f"{idx}.npz"),
-                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx)}", "controller2", f"robot_{idx}_controller.pt"),
+                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,True,gen)}", "controller2", f"robot_{idx}_controller.pt"),
                         reward = reward2,
                         env_name = self.env_names[1],
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
@@ -162,8 +163,8 @@ class Job():
 if __name__ == '__main__':
     exp_root = os.path.join('saved_data')
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
-    env_name1="Climber-v0"
-    env_name2="Climber-v1"
+    env_name1="Jumper-v0"
+    env_name2="PlatformJumper-v0"
     expr_name=env_name1+"_"+env_name2
 
     my_job = Job(
@@ -172,7 +173,7 @@ if __name__ == '__main__':
         env_names = [env_name1,env_name2],
         ranks = [i for i in range(20)],
         load_dir = exp_root,
-        generations=[i for i in range(0,100,10)],
+        generations=[22],
         population_size=40,
         organize_by_experiment=False,
         organize_by_generation=True,

@@ -105,12 +105,12 @@ class Job():
         for exp_name, env_name in zip(self.experiment_names, self.env_names):
             exp_gens = self.generations if self.generations is not None else get_generations(self.load_dir, exp_name)
             for gen in exp_gens:
-                id_centroid_dict=make_id_centroid_dict(exp_name, load_dir, gen)
+                id_centroid_dict=make_id_centroid_dict(exp_name, load_dir, gen,self.use_cells)
                 for idx, reward in get_exp_gen_data(exp_name, load_dir, gen):
                     cent_x,cent_y=id_to_centroid(id_centroid_dict,self.use_cells,idx)
                     robots.append(Robot(
                         body_path = os.path.join(load_dir, exp_name, f"generation_{gen}", "structure", f"{idx}.npz"),
-                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx)}", "controller", f"robot_{idx}_controller.pt"),
+                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,self.use_cells,gen)}", "controller", f"robot_{idx}_controller.pt"),
                         reward = reward,
                         env_name = env_name,
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
@@ -136,21 +136,24 @@ class Job():
 if __name__ == '__main__':
     exp_root = os.path.join('saved_data')
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
-    env_name="Walker-v0"
-    experiment_name = env_name+"_"+"ME"
-    use_cells=True
+    env_name="PlatformJumper-v0"
+    experiment_name = env_name+"_"+"GA"
+    use_cells=False
+    is_transfer=False
+    transfer_gen=100
+    suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
 
     my_job = Job(
-        name = experiment_name,
-        experiment_names= [experiment_name],
+        name = experiment_name+suffix,
+        experiment_names= [experiment_name+suffix],
         env_names = [env_name],
         load_dir = exp_root,
-        generations=[847],
-        population_size=8,
+        generations=[54],
+        population_size=40,
         #ranks = [i for i in range(3)], #not use when use_cells=True
-        use_cells=True,
+        use_cells=use_cells,
         organize_by_experiment=False,
-        organize_by_generation=False,
+        organize_by_generation=True,
     )
     
     my_job.generate(load_dir=exp_root, save_dir=save_dir)
