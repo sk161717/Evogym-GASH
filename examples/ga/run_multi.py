@@ -205,7 +205,7 @@ class MyCallback(Callback):
 
 
 
-def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, train_iters, num_cores,env_name1,env_name2,seed=0):
+def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, train_iters, num_cores,env_name1,env_name2,seed=0,is_ist=False):
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
     start_gen = 0
@@ -218,8 +218,13 @@ def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, t
         os.makedirs(home_path)
     except:
         print(f'THIS EXPERIMENT ({experiment_name}) ALREADY EXISTS')
-        print("Override? (y/n/c): ", end="")
-        ans = input()
+        
+        if is_ist:
+            print("FORCE OVERRIDE")
+            ans="y"
+        else:
+            print("Override? (y/n/c): ", end="")
+            ans = input()
         if ans.lower() == "y":
             shutil.rmtree(home_path)
             print()

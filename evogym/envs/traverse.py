@@ -2,7 +2,7 @@ from evogym.envs.base import EvoGymBase
 import gym
 from gym import error, spaces
 from gym import utils
-from gym.utils import seeding
+from gym.utils import seeding,UnstableCounter
 
 from evogym import *
 from evogym.envs import BenchmarkBase
@@ -353,13 +353,16 @@ class FloatingPlatform(StairsBase):
         # terrain
         self.terrain_list = ["platform_1", "platform_2", "platform_3", "platform_4", "platform_5", "platform_6", "platform_7"]
 
+        self.unstable_counter=UnstableCounter('PlatformJumper-v0')
+
     def step(self, action):
 
         # collect pre step information
         robot_pos_init = self.object_pos_at_time(self.get_time(), "robot")
-
+        
         # step
         done = super().step({'robot': action})
+        self.unstable_counter.step()
 
         # collect post step information
         robot_pos_final = self.object_pos_at_time(self.get_time(), "robot")
@@ -379,6 +382,7 @@ class FloatingPlatform(StairsBase):
         # error check unstable simulation
         if done:
             print("SIMULATION UNSTABLE... TERMINATING")
+            self.unstable_counter.error()
             reward -= 3.0
 
         # check if y coordinate is below lowest platform

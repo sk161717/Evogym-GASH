@@ -166,14 +166,15 @@ if __name__ == '__main__':
     env_name1="Jumper-v0"
     env_name2="PlatformJumper-v0"
     expr_name=env_name1+"_"+env_name2
+    seed=20
 
     my_job = Job(
-        name = expr_name,
-        experiment_names= [expr_name],
+        name = expr_name+'_seed:'+str(seed),
+        experiment_names= [expr_name+'_seed:'+str(seed)],
         env_names = [env_name1,env_name2],
-        ranks = [i for i in range(20)],
+        ranks = [i for i in range(40)],
         load_dir = exp_root,
-        generations=[22],
+        generations=[25],
         population_size=40,
         organize_by_experiment=False,
         organize_by_generation=True,

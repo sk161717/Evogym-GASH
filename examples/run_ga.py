@@ -8,7 +8,7 @@ from ppo.arguments import get_args
 import pyME.map_elites.common as cm_map_elites
 
 if __name__ == "__main__":
-    seed = 20
+    seed = 10
     random.seed(seed)
     np.random.seed(seed)
     env_name="PlatformJumper-v0"

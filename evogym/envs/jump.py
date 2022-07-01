@@ -1,7 +1,7 @@
 import gym
 from gym import error, spaces
 from gym import utils
-from gym.utils import seeding
+from gym.utils import seeding,UnstableCounter
 
 from evogym import *
 from evogym.envs import BenchmarkBase
@@ -30,6 +30,8 @@ class StationaryJump(BenchmarkBase):
         self.action_space = spaces.Box(low= 0.6, high=1.6, shape=(num_actuators,), dtype=np.float)
         self.observation_space = spaces.Box(low=-100.0, high=100.0, shape=(2 + num_robot_points + (self.sight_dist*2 +1),), dtype=np.float)
 
+        self.unstable_counter=UnstableCounter('Jumper-v0')
+        
     def step(self, action):
 
         # collect pre step information
@@ -37,6 +39,7 @@ class StationaryJump(BenchmarkBase):
 
         # step
         done = super().step({'robot': action})
+        self.unstable_counter.step()
 
         # collect post step information
         pos_2 = self.object_pos_at_time(self.get_time(), "robot")
@@ -56,6 +59,7 @@ class StationaryJump(BenchmarkBase):
         # error check unstable simulation
         if done:
             print("SIMULATION UNSTABLE... TERMINATING")
+            self.unstable_counter.error()
             reward -= 3.0
 
         # observation, reward, has simulation met termination conditions, debugging info

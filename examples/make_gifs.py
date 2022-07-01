@@ -138,17 +138,18 @@ if __name__ == '__main__':
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
     env_name="PlatformJumper-v0"
     experiment_name = env_name+"_"+"GA"
+    seed=0
     use_cells=False
     is_transfer=False
     transfer_gen=100
     suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
 
     my_job = Job(
-        name = experiment_name+suffix,
-        experiment_names= [experiment_name+suffix],
+        name = experiment_name+suffix+'_seed:'+str(seed),
+        experiment_names= [experiment_name+suffix+'_seed:'+str(seed)],
         env_names = [env_name],
         load_dir = exp_root,
-        generations=[54],
+        generations=[114],
         population_size=40,
         #ranks = [i for i in range(3)], #not use when use_cells=True
         use_cells=use_cells,

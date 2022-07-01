@@ -420,3 +420,20 @@ class Pair():
 
     def __hash__(self,):
         return hash(self.__repr__())
+
+#additional area
+class UnstableCounter():
+    def __init__(self,env) -> None:
+        self.step_count=0
+        self.error_count=0
+        self.env=env
+    
+    def step(self):
+        self.step_count+=1
+        print("OK")
+        if self.step_count%1e3==0:
+            print('UNSTABLE SIMULATION RATE IN '+self.env+' : '+str(self.error_count/self.step_count))
+    
+    def error(self):
+        self.error_count+=1
+        
