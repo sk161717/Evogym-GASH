@@ -1,5 +1,5 @@
 import math
-import sys,os
+import sys,os,random
 from evogym import is_connected, has_actuator, get_full_connectivity, draw, get_uniform
 import pickle
 curr_dir = os.path.dirname(os.path.abspath(__file__))
@@ -207,13 +207,13 @@ def load_population_hashes(gen,experiment_name):
         hash_dict=pickle.load(f)
     return hash_dict
 
-def save_archive(archive,gen,experiment_name):
-    save_path=os.path.join(root_dir,'saved_data', experiment_name, "generation_" + str(gen),'archive.pkl')
+def save_archive(archive,gen,experiment_name,filename='archive.pkl'):
+    save_path=os.path.join(root_dir,'saved_data', experiment_name, "generation_" + str(gen),filename)
     with open(save_path,'wb') as f:
         pickle.dump(archive,f)
 
-def load_archive(gen,experiment_name):
-    open_path=os.path.join(root_dir,'saved_data',experiment_name,"generation_" + str(gen-1),'archive.pkl')
+def load_archive(gen,experiment_name,filename='archive.pkl'):
+    open_path=os.path.join(root_dir,'saved_data',experiment_name,"generation_" + str(gen-1),filename)
     with open(open_path,'rb') as f:
         archive=pickle.load(f)
     return archive
@@ -226,6 +226,7 @@ def calc_curr_evaluation(gen,n_samples,batch_size):
         else:
             curr_eval+=batch_size
     return curr_eval
+
 def load_evaluation(expr_name,gen):
     outputTXT_path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'output.txt')
     with open(outputTXT_path,'r') as f:
@@ -235,6 +236,14 @@ def load_evaluation(expr_name,gen):
     curr_evaluation=int(line.split()[2])
     return curr_evaluation
 
+def tournament_selection(structures,pop_size):
+    selected_indices = random.sample(range(pop_size), 2)
+    a=structures[selected_indices[0]]
+    b=structures[selected_indices[1]]
+    if a.fitness>=b.fitness:
+        return selected_indices[0]
+    else:
+        return selected_indices[1]
 
 if __name__ == "__main__":
 

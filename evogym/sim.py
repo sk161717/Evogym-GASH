@@ -3,7 +3,6 @@
 """
 This module defines the EvoSim class which provides a clean interface to Evolution Gym's simulator.
 """
-print("sim loaded")
 from typing import Dict, Set
 import numpy as np
 from evogym.world import EvoWorld

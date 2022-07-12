@@ -36,18 +36,21 @@ unique_label=UniqueLabel()
 
 class MyProblem(Problem):
 
-    def __init__(self,algorithm,tc,num_cores,env_name1,env_name2) -> None:
+    def __init__(self,algorithm,tc,num_cores,env_name1,env_name2,is_two_env_parallel=False) -> None:
         super().__init__(n_var=1, n_obj=2, n_constr=0)
         self.algorithm=algorithm
         self.tc = tc
         self.num_cores=num_cores
         self.env_name1=env_name1
         self.env_name2=env_name2
+        self.is_two_env_parallel=is_two_env_parallel
 
     def _evaluate(self, X, out, *args, **kwargs):
-        
-        fitness1=self.RunOneEnv(X,self.env_name1,save_path_controller1,1)
-        fitness2=self.RunOneEnv(X,self.env_name2,save_path_controller2,2)
+        if self.is_two_env_parallel:
+            fitness1,fitness2=self.RunParallelEnv(X,self.env_name1,self.env_name2)
+        else:
+            fitness1=self.RunOneEnv(X,self.env_name1,save_path_controller1,1)
+            fitness2=self.RunOneEnv(X,self.env_name2,save_path_controller2,2)
         out["F"] = np.column_stack([fitness1, fitness2])
     
     def RunOneEnv(self,X,env_name,save_path_controller,env_index):
@@ -74,6 +77,25 @@ class MyProblem(Problem):
                 f[i][0]=-x[0].fitness2
         return f
 
+    def RunParallelEnv(self,X,env_name1,env_name2):
+        global curr_evaluation
+        group = mp.Group()
+        for x in X:
+            ppo_args1 = ((x[0].body, x[0].connections), self.tc, (save_path_controller1, x[0].label),env_name1)
+            ppo_args2 = ((x[0].body, x[0].connections), self.tc, (save_path_controller2, x[0].label),env_name2)
+            group.add_job(run_ppo, ppo_args1, callback=x[0].set_reward)
+            group.add_job(run_ppo, ppo_args2, callback=x[0].set_reward2)
+            curr_evaluation+=2
+        group.run_jobs(self.num_cores)
+
+        f1=np.full((X.shape[0],1),None,dtype=object)
+        f2=np.full((X.shape[0],1),None,dtype=object)
+        for i,x in enumerate(X):
+            x[0].compute_fitness()
+            f1[i][0]=-x[0].fitness
+            x[0].compute_fitness2()
+            f2[i][0]=-x[0].fitness2
+        return f1,f2
 
 class MySampling(Sampling):
     def __init__(self,structure_shape,experiment_name,is_continuing=False):
@@ -203,9 +225,18 @@ class MyCallback(Callback):
             unique_label.update_last_label()
 
 
-
-
-def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, train_iters, num_cores,env_name1,env_name2,seed=0,is_ist=False):
+def run_multi_ga(
+    experiment_name, 
+    structure_shape, 
+    pop_size, 
+    total_generation, 
+    train_iters, 
+    num_cores,
+    env_name1,
+    env_name2,
+    seed=0,
+    is_two_env_parallel=False,
+    is_ist=False):
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
     start_gen = 0
@@ -284,7 +315,7 @@ def run_multi_ga(experiment_name, structure_shape, pop_size, total_generation, t
         eliminate_duplicates=False
     )
 
-    res = minimize(MyProblem(algorithm,tc,num_cores,env_name1,env_name2),
+    res = minimize(MyProblem(algorithm,tc,num_cores,env_name1,env_name2,is_two_env_parallel),
                 algorithm,
                 ('n_gen',total_generation),
                 seed=seed,

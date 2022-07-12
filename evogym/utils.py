@@ -430,8 +430,7 @@ class UnstableCounter():
     
     def step(self):
         self.step_count+=1
-        print("OK")
-        if self.step_count%1e3==0:
+        if self.step_count%1e5==0:
             print('UNSTABLE SIMULATION RATE IN '+self.env+' : '+str(self.error_count/self.step_count))
     
     def error(self):

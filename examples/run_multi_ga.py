@@ -6,22 +6,26 @@ from ga.run_multi import run_multi_ga
 from ppo.arguments import get_args
 
 if __name__ == "__main__":
-    seed = 30
+    seed = 20
     random.seed(seed)
     np.random.seed(seed)
     env_name1="Jumper-v0"
     env_name2="PlatformJumper-v0"
     is_ist=True
+    is_two_env_parallel=True
+    is_specialJump=True
+    suffix='_forwardJump' if is_specialJump else ''
     
     run_multi_ga(
-        pop_size = 40,
+        pop_size = 32,
         structure_shape = (5,5),
-        experiment_name = env_name1+"_"+env_name2+'_seed:'+str(seed),
-        total_generation = 1000,
+        experiment_name = env_name1+"_"+env_name2+suffix+'_seed:'+str(seed),
+        total_generation = 60,
         train_iters =1000,
-        num_cores =40,
+        num_cores =64,
         env_name1=env_name1,
         env_name2=env_name2,
         seed=seed,
+        is_two_env_parallel=is_two_env_parallel,
         is_ist=is_ist,
     )

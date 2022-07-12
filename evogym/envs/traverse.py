@@ -2,7 +2,7 @@ from evogym.envs.base import EvoGymBase
 import gym
 from gym import error, spaces
 from gym import utils
-from gym.utils import seeding,UnstableCounter
+from gym.utils import seeding
 
 from evogym import *
 from evogym.envs import BenchmarkBase
@@ -359,7 +359,7 @@ class FloatingPlatform(StairsBase):
 
         # collect pre step information
         robot_pos_init = self.object_pos_at_time(self.get_time(), "robot")
-        
+
         # step
         done = super().step({'robot': action})
         self.unstable_counter.step()
