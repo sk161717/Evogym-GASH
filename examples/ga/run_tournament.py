@@ -108,7 +108,7 @@ def run_ga_tournament(
             while (hashable(temp_structure[0]) in population_structure_hashes):
                 temp_structure = sample_robot(structure_shape)
 
-            structures.append(Structure(*temp_structure, unique_label.give_label()))
+            structures.append(Structure(*temp_structure, unique_label.give_label(),-1))
             population_structure_hashes[hashable(temp_structure[0])] = True
 
     else:  
@@ -119,9 +119,6 @@ def run_ga_tournament(
         assert len(structures) == 2*pop_size
         print(structures)
     
-    
-    
-
    
     while (num_evaluations < max_evaluations):
          ### MAKE GENERATION DIRECTORIES ###
@@ -162,16 +159,11 @@ def run_ga_tournament(
         structures = structures[:pop_size]
 
         #SAVE RANKING TO FILE
-        temp_path = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation), "output.txt")
-        f = open(temp_path, "w")
+        write_output(structures,experiment_name,generation,num_evaluations)
+        plot_graph(experiment_name,generation,False)
 
-        out = ""
-        for structure in structures:
-            out += str(structure.label) + "\t\t" + str(structure.fitness) + "\n"
-        out+="current evaluation: "+str(num_evaluations)+"\n"
-        f.write(out)
-        f.close()
-
+        #SAVE LINEAGE TO FILE
+        add_lineage(structures,experiment_name,generation)
 
          ### CHECK EARLY TERMINATION ###
         if num_evaluations > max_evaluations:
@@ -190,10 +182,10 @@ def run_ga_tournament(
             if child != None and hashable(child[0]) not in population_structure_hashes:
                 
                 # overwrite structures array w new child
-                structures.append(Structure(*child, unique_label.give_label()))
+                structures.append(Structure(*child, unique_label.give_label(),structures[parent_index].label))
                 population_structure_hashes[hashable(child[0])] = True
                 num_children+=1
-        assert len(population_structure_hashes)==(generation+2)*pop_size
+        
         
         save_polulation_hashes(population_structure_hashes,generation,experiment_name)
         # write structure pkl file(structure length = 2* popsize)

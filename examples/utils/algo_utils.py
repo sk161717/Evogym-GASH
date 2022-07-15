@@ -2,12 +2,14 @@ import math
 import sys,os,random
 from evogym import is_connected, has_actuator, get_full_connectivity, draw, get_uniform
 import pickle
+import matplotlib.pyplot as plt
+import numpy as np
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.join(curr_dir, '..')
 
 class Structure():
 
-    def __init__(self, body, connections, label):
+    def __init__(self, body, connections, label,parent_label):
         self.body = body
         self.connections = connections
 
@@ -23,6 +25,7 @@ class Structure():
         self.prev_gen_label = 0
 
         self.label = label
+        self.parent_label=parent_label
 
     def compute_fitness(self):
 
@@ -183,20 +186,15 @@ def total_robots_explored_breakpoints_evals(pop_size, max_evals):
 class UniqueLabel():
     def __init__(self) -> None:
         self.label=-1
-        self.prev_gen_last_label=-1
 
     def give_label(self):
         self.label+=1
         return self.label
     
-    def update_last_label(self):
-        self.prev_gen_last_label=self.label
-    
     def set_label_start_for_resuming(self,start_label):
         self.label=start_label-1
 
 def save_polulation_hashes(hash_dict,gen,experiment_name):
-    print('population structure hash length : '+str(len(hash_dict)))
     save_path=os.path.join(root_dir,'saved_data', experiment_name, "generation_" + str(gen),'population_structure_hashes.pkl')
     with open(save_path,'wb') as f:
         pickle.dump(hash_dict,f)
@@ -244,6 +242,75 @@ def tournament_selection(structures,pop_size):
         return selected_indices[0]
     else:
         return selected_indices[1]
+
+def write_output(structures,expr_name,gen,num_evaluations):
+    temp_path = os.path.join(root_dir, "saved_data", expr_name, "generation_" + str(gen), "output.txt")
+    f = open(temp_path, "w")
+
+    out = ""
+    for structure in structures:
+        out += str(structure.label) + "\t\t" + str(structure.fitness) + "\n"
+    out+="current evaluation: "+str(num_evaluations)+"\n"
+    f.write(out)
+    f.close()
+    
+def add_lineage(structures,expr_name,gen):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'lineage.txt')
+    child_parent_dict={}
+    with open(path,'w') as f:
+        out=''
+        if gen!=0:
+            past_path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen-1),'lineage.txt')
+            with open(past_path,'r') as f_past:
+                for line in f_past:
+                    child_parent_dict[int(line.split(' ')[0])]=line.split(' ')[1]
+                    out+= str(line.split(' ')[0])+  ' ' + str(line.split(' ')[1])
+        for structure in structures:
+            if structure.label not in child_parent_dict:
+                out+= str(structure.label)+  ' ' + str(structure.parent_label) +'\n'
+        f.write(out)
+
+def max_fit_list(expr_name,generation,is_multi=False):
+    fitness_gen=[]
+    evaluation_list=[]
+    for i in range(generation+1):
+        log_dir = os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(i),'output.txt')
+        with open(log_dir) as f:
+            fitnesses=[]
+            for line in f:
+                try:
+                    if is_multi:
+                        fitnesses.append(float(line.split()[2]))
+                    else:
+                        fitnesses.append(float(line.split()[1]))
+                except:
+                    evaluation_list.append(int(line.split()[2]))
+            if is_multi:
+                evaluation_list.append(fitnesses[len(fitnesses)-1])
+                del fitnesses[len(fitnesses)-1]
+            fitness_gen.append(max(fitnesses))
+    return fitness_gen,evaluation_list
+
+def plot_graph(expr_name,gen,is_multi,is_eval_base=True):
+    fitness_list,evaluation_list=max_fit_list(expr_name,gen,is_multi=is_multi)
+    fig = plt.figure(figsize=(12, 8)) #...1
+    
+    # Figure内にAxesを追加()
+    ax = fig.add_subplot(111) #...2
+    if is_eval_base==False:
+        evaluation_list=np.array(evaluation_list)/2
+    ax.plot(evaluation_list, fitness_list) 
+    plt.xlabel('evaluations' if is_eval_base else 'evaluated design')
+    plt.ylabel('score of platformjumper')
+
+    # 凡例の表示
+    plt.legend()
+
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'score.pdf')
+    # プロット表示(設定の反映)
+    plt.savefig(path)
+    
+
 
 if __name__ == "__main__":
 

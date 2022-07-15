@@ -7,7 +7,7 @@ from ga.run_tournament import run_ga_tournament
 from ppo.arguments import get_args
 
 if __name__ == "__main__":
-    seed = 0
+    seed = 20
     random.seed(seed)
     np.random.seed(seed)
     env_name="PlatformJumper-v0"
@@ -24,7 +24,7 @@ if __name__ == "__main__":
             structure_shape = (5,5),
             pop_size = 32,
             train_iters = 1000,
-            num_cores = 32,
+            num_cores = 8,
             env_name=env_name,
             max_evaluations = 3000,
         )

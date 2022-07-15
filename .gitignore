@@ -10,12 +10,16 @@ old/
 *.vcxproj.*
 *.sln
 *.egg-info
+*.pdf
+*.npz
+*.ipynb
 dist/
 build/
 __pycache__/
 examples/saved_data/
 examples/__pycache__
 examples/api_planning.txt
+examples/.ipynb_checkpoints/
 evogym/__pycache__
 evogym/envs/__pycache__
 build_scripts

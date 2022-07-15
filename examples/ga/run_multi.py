@@ -19,7 +19,7 @@ curr_evaluation=0
 from ppo import run_ppo
 from evogym import sample_robot, hashable
 import utils.mp_group as mp
-from utils.algo_utils import mutate, TerminationCondition, Structure,UniqueLabel,save_polulation_hashes
+from utils.algo_utils import *
 from make_gifs_multi import Job
 from pymoo.core.sampling import Sampling
 from pymoo.core.crossover import Crossover
@@ -127,7 +127,7 @@ class MySampling(Sampling):
             while (hashable(temp_structure[0]) in population_structure_hashes):
                 temp_structure = sample_robot(self.structure_shape)
 
-            X[i, 0] = Structure(*temp_structure, unique_label.give_label())
+            X[i, 0] = Structure(*temp_structure, unique_label.give_label(),-1)
             population_structure_hashes[hashable(temp_structure[0])] = True
 
         return X
@@ -156,7 +156,7 @@ class MyMutation(Mutation):
                 child = mutate(X[i,0].body.copy(), mutation_rate = 0.1, num_attempts=50)
 
             # overwrite structures array w new child
-            X[i,0] = Structure(*child, unique_label.give_label())
+            X[i,0] = Structure(*child, unique_label.give_label(),X[i,0].label)
             population_structure_hashes[hashable(child[0])] = True
 
         return X
@@ -199,6 +199,10 @@ class MyCallback(Callback):
             out+="current evaluation: "+str(curr_evaluation)+"\n"
             f.write(out)
             f.close()
+            plot_graph(self.experiment_name,generation,True)
+            
+            #SAVE LINEAGE TO FILE
+            add_lineage(np.ravel(structures),self.experiment_name,generation)
 
             print(f'FINISHED GENERATION {generation}\n')
            
@@ -222,7 +226,6 @@ class MyCallback(Callback):
                 os.makedirs(save_path_controller2)
             except:
                 pass
-            unique_label.update_last_label()
 
 
 def run_multi_ga(

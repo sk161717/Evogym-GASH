@@ -109,8 +109,8 @@ class Job():
                 for idx, reward in get_exp_gen_data(exp_name, load_dir, gen):
                     cent_x,cent_y=id_to_centroid(id_centroid_dict,self.use_cells,idx)
                     robots.append(Robot(
-                        body_path = os.path.join(load_dir, exp_name, f"generation_{gen}", "structure", f"{idx}.npz"),
-                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,self.use_cells,gen)}", "controller", f"robot_{idx}_controller.pt"),
+                        body_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,True,gen)}", "structure", f"{idx}.npz"),
+                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,True,gen)}", "controller", f"robot_{idx}_controller.pt"),
                         reward = reward,
                         env_name = env_name,
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
@@ -137,13 +137,14 @@ if __name__ == '__main__':
     exp_root = os.path.join('saved_data')
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
     env_name="PlatformJumper-v0"
-    experiment_name = env_name+"_"+"GA"
+    experiment_name = env_name+"_"+"TournamentGA"
     seed=20
     use_cells=False
     is_transfer=False
     transfer_gen=100
     suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
 
+    '''
     env_name1="Jumper-v0"
     env_name2="PlatformJumper-v0"
     is_specialJump=False
@@ -151,18 +152,19 @@ if __name__ == '__main__':
     load_seed=20
     score=8.52
     expr_name=env_name1+"_"+env_name2+suffix+'_seed:'+str(load_seed)
+    '''
 
-    experiment_name='Repro_from_'+expr_name+'_score:'+str(score)
+    #experiment_name='Repro_from_'+expr_name+'_score:'+str(score)
     my_job = Job(
-        #name = experiment_name+suffix+'_seed:'+str(seed),
-        name = experiment_name,
-        #experiment_names= [experiment_name+suffix+'_seed:'+str(seed)],
-        experiment_names=[experiment_name],
+        name = experiment_name+suffix+'_seed:'+str(seed),
+        #name = experiment_name,
+        experiment_names= [experiment_name+suffix+'_seed:'+str(seed)],
+        #experiment_names=[experiment_name],
         env_names = [env_name],
         load_dir = exp_root,
-        generations=[0],
-        population_size=4,
-        ranks = [i for i in range(4)], #not use when use_cells=True
+        generations=[23],
+        population_size=32,
+        ranks = [i for i in range(5)], #not use when use_cells=True
         use_cells=use_cells,
         organize_by_experiment=False,
         organize_by_generation=True,

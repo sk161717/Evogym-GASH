@@ -165,19 +165,21 @@ if __name__ == '__main__':
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
     env_name1="Jumper-v0"
     env_name2="PlatformJumper-v0"
+    #env_name1="Walker-v0"
+    #env_name2="BridgeWalker-v0"
     is_specialJump=True
     suffix='_forwardJump' if is_specialJump else ''
     expr_name=env_name1+"_"+env_name2+suffix
-    seed=20
+    seed=40
     
 
     my_job = Job(
         name = expr_name+'_seed:'+str(seed),
         experiment_names= [expr_name+'_seed:'+str(seed)],
         env_names = [env_name1,env_name2],
-        ranks = [i for i in range(5)],
+        ranks = [i for i in range(4)],
         load_dir = exp_root,
-        generations=[1],
+        generations=[8],
         population_size=32,
         organize_by_experiment=False,
         organize_by_generation=True,
