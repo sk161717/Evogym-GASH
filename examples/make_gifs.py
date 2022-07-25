@@ -115,6 +115,7 @@ class Job():
                         env_name = env_name,
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
                         gen = gen if len(exp_gens) != 1 else None,
+                        idx=idx,
                         cent=(cent_x,cent_y),
                     ))
 
@@ -126,7 +127,7 @@ class Job():
         for i, robot in zip(ranks, robots):
             cent_info= '' if robot.cent==(None,None) else 'x='+str(robot.cent[0])+', y='+str(robot.cent[1])
             save_robot_gif(
-                os.path.join(save_dir, f'{i}_{robot}_{cent_info}'),
+                os.path.join(save_dir, f'{robot}_{str(robot.idx)}_{cent_info}'),
                 robot.env_name,
                 robot.body_path,
                 robot.ctrl_path
@@ -136,9 +137,9 @@ class Job():
 if __name__ == '__main__':
     exp_root = os.path.join('saved_data')
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
-    env_name="PlatformJumper-v0"
-    experiment_name = env_name+"_"+"TournamentGA"
-    seed=20
+    env_name="Walker-v0"
+    experiment_name = env_name+"_"+"NSGC"
+    seed=0
     use_cells=False
     is_transfer=False
     transfer_gen=100
@@ -162,9 +163,9 @@ if __name__ == '__main__':
         #experiment_names=[experiment_name],
         env_names = [env_name],
         load_dir = exp_root,
-        generations=[23],
+        generations=[25],
         population_size=32,
-        ranks = [i for i in range(5)], #not use when use_cells=True
+        ranks = [i for i in range(32)], #not use when use_cells=True
         use_cells=use_cells,
         organize_by_experiment=False,
         organize_by_generation=True,

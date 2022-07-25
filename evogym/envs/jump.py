@@ -39,7 +39,6 @@ class StationaryJump(BenchmarkBase):
 
         # step
         done = super().step({'robot': action})
-        self.unstable_counter.step()
 
         # collect post step information
         pos_2 = self.object_pos_at_time(self.get_time(), "robot")
@@ -54,8 +53,7 @@ class StationaryJump(BenchmarkBase):
         # compute reward
         com_1 = np.mean(pos_1, 1)
         com_2 = np.mean(pos_2, 1)
-        penalty=abs(com_2[0] - com_1[0]) if com_2[0] - com_1[0]<0 else 0
-        reward = (com_2[1] - com_1[1])*10 - penalty
+        reward = (com_2[1] - com_1[1])*10 - abs(com_2[0] - com_1[0])*5
         
         # error check unstable simulation
         if done:

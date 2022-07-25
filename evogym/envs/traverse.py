@@ -362,7 +362,6 @@ class FloatingPlatform(StairsBase):
 
         # step
         done = super().step({'robot': action})
-        self.unstable_counter.step()
 
         # collect post step information
         robot_pos_final = self.object_pos_at_time(self.get_time(), "robot")

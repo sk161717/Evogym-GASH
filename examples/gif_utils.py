@@ -51,9 +51,11 @@ def save_robot_gif(out_path, env_name, body_path, ctrl_path,cent=(None,None)):
     masks = torch.zeros(1, 1)
     
     obs = env.reset()
+    #死にポイント
     img = env.render(mode='img')
     reward = None
     done = False
+    
     
     imgs = []
     # arrays = []
@@ -129,6 +131,7 @@ class Robot():
         reward=None, 
         env_name=None, 
         exp_name=None, 
+        idx=None,
         gen=None,
         cent=None
         ):
@@ -138,6 +141,7 @@ class Robot():
         self.env_name = env_name
         self.exp_name = exp_name
         self.gen = gen
+        self.idx=idx
         self.cent=cent
     def __str__(self):
         exp_str = f'{self.exp_name}' if self.exp_name is not None else ''

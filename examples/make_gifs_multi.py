@@ -121,7 +121,7 @@ class Job():
                         reward = reward1,
                         env_name = self.env_names[0],
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
-                        gen = gen,
+                        idx=idx,
                         cent=(cent_x,cent_y),
                     ))
                     robots2.append(Robot(
@@ -130,7 +130,7 @@ class Job():
                         reward = reward2,
                         env_name = self.env_names[1],
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
-                        gen = gen ,
+                        idx=idx,
                         cent=(cent_x,cent_y),
                     ))
 
@@ -143,7 +143,7 @@ class Job():
         for i, robot in zip(ranks, robots1):
             cent_info= '' if robot.cent==(None,None) else 'x='+str(robot.cent[0])+', y='+str(robot.cent[1])
             save_robot_gif(
-                os.path.join(save_dir, f'{self.env_names[0]}_{i}_{robot}_{cent_info}'),
+                os.path.join(save_dir, f'{self.env_names[0]}_{i}_{robot}_{str(robot.idx)}_{cent_info}'),
                 robot.env_name,
                 robot.body_path,
                 robot.ctrl_path
@@ -152,7 +152,7 @@ class Job():
         for i, robot in zip(ranks, robots2):
             cent_info= '' if robot.cent==(None,None) else 'x='+str(robot.cent[0])+', y='+str(robot.cent[1])
             save_robot_gif(
-                os.path.join(save_dir, f'{self.env_names[1]}_{i}_{robot}_{cent_info}'),
+                os.path.join(save_dir, f'{self.env_names[1]}_{i}_{robot}_{str(robot.idx)}_{cent_info}'),
                 robot.env_name,
                 robot.body_path,
                 robot.ctrl_path
@@ -167,10 +167,10 @@ if __name__ == '__main__':
     env_name2="PlatformJumper-v0"
     #env_name1="Walker-v0"
     #env_name2="BridgeWalker-v0"
-    is_specialJump=True
+    is_specialJump=False
     suffix='_forwardJump' if is_specialJump else ''
     expr_name=env_name1+"_"+env_name2+suffix
-    seed=40
+    seed=20
     
 
     my_job = Job(
@@ -179,8 +179,8 @@ if __name__ == '__main__':
         env_names = [env_name1,env_name2],
         ranks = [i for i in range(4)],
         load_dir = exp_root,
-        generations=[8],
-        population_size=32,
+        generations=[28],
+        population_size=40,
         organize_by_experiment=False,
         organize_by_generation=True,
     )

@@ -1,4 +1,5 @@
 import os
+from venv import create
 import numpy as np
 import shutil
 import random
@@ -36,7 +37,7 @@ unique_label=UniqueLabel()
 
 class MyProblem(Problem):
 
-    def __init__(self,algorithm,tc,num_cores,env_name1,env_name2,is_two_env_parallel=False) -> None:
+    def __init__(self,algorithm,tc,num_cores,env_name1,env_name2,is_two_env_parallel=False,is_NSGC=False) -> None:
         super().__init__(n_var=1, n_obj=2, n_constr=0)
         self.algorithm=algorithm
         self.tc = tc
@@ -44,10 +45,13 @@ class MyProblem(Problem):
         self.env_name1=env_name1
         self.env_name2=env_name2
         self.is_two_env_parallel=is_two_env_parallel
+        self.is_NSGC=is_NSGC
 
     def _evaluate(self, X, out, *args, **kwargs):
         if self.is_two_env_parallel:
             fitness1,fitness2=self.RunParallelEnv(X,self.env_name1,self.env_name2)
+        elif self.is_NSGC:
+            fitness1,fitness2=self.NSGC(X,self.env_name1,save_path_controller1)
         else:
             fitness1=self.RunOneEnv(X,self.env_name1,save_path_controller1,1)
             fitness2=self.RunOneEnv(X,self.env_name2,save_path_controller2,2)
@@ -76,6 +80,23 @@ class MyProblem(Problem):
                 x[0].compute_fitness2()
                 f[i][0]=-x[0].fitness2
         return f
+    
+    def NSGC(self,X,env_name,save_path_controller):
+        global curr_evaluation
+        group = mp.Group()
+        for x in X:
+            ppo_args = ((x[0].body, x[0].connections), self.tc, (save_path_controller, x[0].label),env_name)
+            group.add_job(run_ppo, ppo_args, callback=x[0].set_reward)
+            curr_evaluation+=1
+        group.run_jobs(self.num_cores)
+
+        f1=np.full((X.shape[0],1),None,dtype=object)
+        f2=compute_novelty(X)
+        for i,x in enumerate(X):
+            f1[i][0]=-x[0].fitness
+            x[0].fitness2=f2[i][0]
+            f2[i][0]=-f2[i][0]
+        return f1,f2
 
     def RunParallelEnv(self,X,env_name1,env_name2):
         global curr_evaluation
@@ -97,28 +118,39 @@ class MyProblem(Problem):
             f2[i][0]=-x[0].fitness2
         return f1,f2
 
-class MySampling(Sampling):
-    def __init__(self,structure_shape,experiment_name,is_continuing=False):
-        super().__init__()
-        self.structure_shape=structure_shape
-        self.experiment_name=experiment_name
-        self.is_continuing=is_continuing
+def create_controller_dir(experiment_name,gen,is_NSGC):
+    global save_path_controller1
+    global save_path_controller2
 
-    def _do(self, problem, n_samples, **kwargs):
-        global save_path_controller1
-        global save_path_controller2
-
-        save_path_controller1 = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "controller1")
+    if is_NSGC:
+        save_path_controller1 = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(gen), "controller")
         try:
             os.makedirs(save_path_controller1)
         except:
             pass
-            
-        save_path_controller2 = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "controller2")
+    else:
+        save_path_controller1 = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(gen), "controller1")
+        try:
+            os.makedirs(save_path_controller1)
+        except:
+            pass
+        save_path_controller2 = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(gen), "controller2")
         try:
             os.makedirs(save_path_controller2)
         except:
             pass
+
+
+class MySampling(Sampling):
+    def __init__(self,structure_shape,experiment_name,is_NSGC,is_continuing=False):
+        super().__init__()
+        self.structure_shape=structure_shape
+        self.experiment_name=experiment_name
+        self.is_continuing=is_continuing
+        self.is_NSGC=is_NSGC
+
+    def _do(self, problem, n_samples, **kwargs):
+        create_controller_dir(self.experiment_name,generation,self.is_NSGC)
 
         X = np.full((n_samples, 1), None, dtype=object)
 
@@ -162,9 +194,10 @@ class MyMutation(Mutation):
         return X
 
 class MyCallback(Callback):
-        def __init__(self,experiment_name) -> None:
+        def __init__(self,experiment_name,is_NSGC) -> None:
             super().__init__()
             self.experiment_name = experiment_name
+            self.is_NSGC=is_NSGC
 
         def notify(self, algorithm):
             global generation
@@ -215,17 +248,10 @@ class MyCallback(Callback):
 
             #make directory for next generation
             generation+=1
-            save_path_controller1 = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "controller1")
-            try:
-                os.makedirs(save_path_controller1)
-            except:
-                pass
-                
-            save_path_controller2 = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "controller2")
-            try:
-                os.makedirs(save_path_controller2)
-            except:
-                pass
+            create_controller_dir(self.experiment_name,generation,self.is_NSGC)
+            
+            
+
 
 
 def run_multi_ga(
@@ -239,7 +265,8 @@ def run_multi_ga(
     env_name2,
     seed=0,
     is_two_env_parallel=False,
-    is_ist=False):
+    is_ist=False,
+    is_NSGC=False):
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
     start_gen = 0
@@ -312,17 +339,17 @@ def run_multi_ga(
     #Multiobjective Initialization
     algorithm=NSGA2(
         pop_size=pop_size,
-        sampling=MySampling(structure_shape,experiment_name),
+        sampling=MySampling(structure_shape,experiment_name,is_NSGC),
         mutation=MyMutation(),
         crossover=MyCrossover(),
         eliminate_duplicates=False
     )
 
-    res = minimize(MyProblem(algorithm,tc,num_cores,env_name1,env_name2,is_two_env_parallel),
+    res = minimize(MyProblem(algorithm,tc,num_cores,env_name1,env_name2,is_two_env_parallel,is_NSGC),
                 algorithm,
                 ('n_gen',total_generation),
                 seed=seed,
-                callback=MyCallback(experiment_name),
+                callback=MyCallback(experiment_name,is_NSGC),
                 verbose=False)
 
     plot = Scatter(title = "Objective Space", labels="f")

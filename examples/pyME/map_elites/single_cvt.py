@@ -12,7 +12,7 @@ sys.path.insert(1, os.path.join(external_dir, 'pytorch_a2c_ppo_acktr_gail'))
 from sklearn.neighbors import KDTree
 
 from pyME.map_elites import common as cm
-from utils.algo_utils import mutate, TerminationCondition, Structure, UniqueLabel,save_polulation_hashes,load_population_hashes,save_archive,load_archive,calc_curr_evaluation
+from utils.algo_utils import *
 from evogym import sample_robot, hashable
 from ppo import run_ppo
 import utils.mp_group as mp
@@ -72,9 +72,10 @@ def make_save_path(expr_name, generation):
 
 # map-elites algorithm (CVT variant)
 def run_single_ME(experiment_name, structure_shape,
-            train_iters, num_cores, env_name, n_samples, batch_size, p_mut,
+            train_iters, num_cores, env_name, n_samples, batch_size, 
             dim_map,
             n_niches,
+            p_mut=1.0,
             params=cm.default_params,
             max_eval=10000,
             produce_gif=False):
@@ -175,7 +176,7 @@ def run_single_ME(experiment_name, structure_shape,
                 while (hashable(temp_structure[0]) in population_structure_hashes):
                     temp_structure = sample_robot(structure_shape)
 
-                X[i] = Structure(*temp_structure, unique_label.give_label())
+                X[i] = Structure(*temp_structure, unique_label.give_label(),-1)
                 population_structure_hashes[hashable(temp_structure[0])] = True
 
         else:  # variation/selection loop
@@ -204,13 +205,15 @@ def run_single_ME(experiment_name, structure_shape,
                     child = mutate(x.body.copy(), mutation_rate=0.1, num_attempts=50)
 
                 # overwrite structures array w new child
-                X[i] = Structure(*child, unique_label.give_label())
+                X[i] = Structure(*child, unique_label.give_label(),x.label)
                 population_structure_hashes[hashable(child[0])] = True
 
             # crossover
             rand1 = np.random.randint(len(keys), size=batch_size)
             rand2 = np.random.randint(len(keys), size=batch_size)
             for i in range(0, n_cross):
+                print('unexpected crossover loop, exit')
+                exit(1)
                 # parent selection
                 x = archive[keys[rand1[i]]]
                 y = archive[keys[rand2[i]]]
@@ -225,10 +228,8 @@ def run_single_ME(experiment_name, structure_shape,
                 X[i] = Structure(*child, unique_label.give_label())
                 population_structure_hashes[hashable(child[0])] = True
 
-            print("n_mut",n_mut,"\n n_cross",n_cross,"\n")
+            #print("n_mut",n_mut,"\n n_cross",n_cross,"\n")
 
-        
-        
         
 
         save_path_controller = make_save_path(experiment_name, generation)
@@ -238,8 +239,6 @@ def run_single_ME(experiment_name, structure_shape,
         for x in X:
             __add_to_archive(x, x.desc, archive, kdt)
         
-        
-
         
 
         ######################save data per generation##########################
@@ -273,6 +272,12 @@ def run_single_ME(experiment_name, structure_shape,
         out+="current evaluation: "+str(curr_evaluation)+"\n"
         f.write(out)
         f.close()
+
+        # plot fitness graph 
+        plot_graph(experiment_name,generation,is_multi=False)
+
+        #SAVE LINEAGE TO FILE
+        add_lineage(structures,experiment_name,generation)
 
         
         cm.save_centroid_and_map(root_dir,experiment_name,generation,archive,n_niches)

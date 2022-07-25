@@ -270,7 +270,7 @@ def add_lineage(structures,expr_name,gen):
                 out+= str(structure.label)+  ' ' + str(structure.parent_label) +'\n'
         f.write(out)
 
-def max_fit_list(expr_name,generation,is_multi=False):
+def max_fit_list_single(expr_name,generation):
     fitness_gen=[]
     evaluation_list=[]
     for i in range(generation+1):
@@ -279,20 +279,42 @@ def max_fit_list(expr_name,generation,is_multi=False):
             fitnesses=[]
             for line in f:
                 try:
-                    if is_multi:
-                        fitnesses.append(float(line.split()[2]))
-                    else:
-                        fitnesses.append(float(line.split()[1]))
+                    fitnesses.append(float(line.split()[1]))
                 except:
                     evaluation_list.append(int(line.split()[2]))
-            if is_multi:
-                evaluation_list.append(fitnesses[len(fitnesses)-1])
-                del fitnesses[len(fitnesses)-1]
             fitness_gen.append(max(fitnesses))
     return fitness_gen,evaluation_list
 
+def max_fit_list_multi(expr_name,generation):
+    fitness1_gen=[]
+    fitness2_gen=[]
+    evaluation_list=[]
+    for i in range(generation+1):
+        log_dir = os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(i),'output.txt')
+        with open(log_dir) as f:
+            fitnesses1=[]
+            fitnesses2=[]
+            for line in f:
+                try:
+                    fitnesses1.append(float(line.split()[1]))
+                    fitnesses2.append(float(line.split()[2]))
+                except:
+                    evaluation_list.append(int(line.split()[2]))
+            fitness1_gen.append(max(fitnesses1))
+            fitness2_gen.append(max(fitnesses2))
+    return fitness1_gen,fitness2_gen,evaluation_list
+
 def plot_graph(expr_name,gen,is_multi,is_eval_base=True):
-    fitness_list,evaluation_list=max_fit_list(expr_name,gen,is_multi=is_multi)
+    if is_multi:
+        fitness1_list,fitness2_list,evaluation_list=max_fit_list_multi(expr_name,gen)
+        plot_one_graph(expr_name,gen,fitness1_list,evaluation_list)
+        plot_one_graph(expr_name,gen,fitness2_list,evaluation_list,index=2)
+    else:    
+        fitness1_list,evaluation_list=max_fit_list_single(expr_name,gen)
+        plot_one_graph(expr_name,gen,fitness1_list,evaluation_list)
+    
+
+def plot_one_graph(expr_name,gen,fitness_list,evaluation_list,index=1,is_eval_base=True):
     fig = plt.figure(figsize=(12, 8)) #...1
     
     # Figure内にAxesを追加()
@@ -301,15 +323,42 @@ def plot_graph(expr_name,gen,is_multi,is_eval_base=True):
         evaluation_list=np.array(evaluation_list)/2
     ax.plot(evaluation_list, fitness_list) 
     plt.xlabel('evaluations' if is_eval_base else 'evaluated design')
-    plt.ylabel('score of platformjumper')
+    plt.ylabel('score of '+str(index))
 
     # 凡例の表示
     plt.legend()
 
-    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'score.pdf')
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'score'+str(index)+'.pdf')
     # プロット表示(設定の反映)
     plt.savefig(path)
-    
+
+
+def calc_edit_distance(structure1,structure2):
+    dist=0
+    for i in range(len(structure1)):
+        for j in range(len(structure2)):
+            if structure1[i][j]!=structure2[i][j]:
+                dist+=1
+    return dist
+
+
+def compute_novelty(X):
+    k=5
+    pop_size=X.shape[0]
+    dist_matrix=np.zeros((pop_size,pop_size))
+    for i in range(pop_size):
+        for j in range(pop_size):
+            if dist_matrix[i][j]==0 and dist_matrix[j][i]==0:
+                dist_matrix[i][j]=calc_edit_distance(X[i][0].body,X[j][0].body)
+            elif dist_matrix[i][j]==0:
+                dist_matrix[i][j]=dist_matrix[j][i]
+            elif dist_matrix[j][i]==0:
+                dist_matrix[j][i]=dist_matrix[i][j]
+    f2=np.full((pop_size,1),None,dtype=object)
+    for i in range(pop_size):
+        topk=np.sort(dist_matrix[i])[1:k+1]
+        f2[i][0]=np.average(topk)
+    return f2
 
 
 if __name__ == "__main__":

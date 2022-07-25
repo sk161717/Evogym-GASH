@@ -30,6 +30,9 @@ def run_ga_tournament(
     num_cores,
     env_name,
     max_evaluations, 
+    dim_map=2,
+    n_niches=32,
+    params=cm.default_params,
     ):
 
     ### STARTUP: MANAGE DIRECTORIES ###
@@ -99,6 +102,11 @@ def run_ga_tournament(
     population_structure_hashes = {}
     num_evaluations = 0
     generation = start_gen
+    archive = {}  # init archive (empty)
+
+    c = cm.cvt(n_niches, dim_map,
+               params['cvt_samples'], params['cvt_use_cache'])
+    kdt = KDTree(c, leaf_size=30, metric='euclidean')
 
     # random initialization
     if not is_continuing:
@@ -113,6 +121,7 @@ def run_ga_tournament(
 
     else:  
         structures=load_archive(generation,experiment_name,filename='structures')
+        archive=load_archive(generation,experiment_name)
         population_structure_hashes=load_population_hashes(generation,experiment_name)
         num_evaluations=calc_curr_evaluation(generation,pop_size,pop_size)
         unique_label.set_label_start_for_resuming(num_evaluations+pop_size)
@@ -154,6 +163,10 @@ def run_ga_tournament(
         ### COMPUTE FITNESS, SORT, AND SAVE ###
         for structure in structures[len(structures)-pop_size:]:
             structure.compute_fitness()
+            structure.desc=cm.calc_desc(structure.body)
+            __add_to_archive(structure,structure.desc,archive,kdt)
+
+        save_archive(archive,generation,experiment_name)
 
         structures = sorted(structures, key=lambda structure: structure.fitness, reverse=True)
         structures = structures[:pop_size]
@@ -161,6 +174,8 @@ def run_ga_tournament(
         #SAVE RANKING TO FILE
         write_output(structures,experiment_name,generation,num_evaluations)
         plot_graph(experiment_name,generation,False)
+
+        cm.save_centroid_and_map(root_dir,experiment_name,generation,archive,n_niches)
 
         #SAVE LINEAGE TO FILE
         add_lineage(structures,experiment_name,generation)
