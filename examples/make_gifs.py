@@ -137,7 +137,7 @@ class Job():
 if __name__ == '__main__':
     exp_root = os.path.join('saved_data')
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
-    env_name="Walker-v0"
+    env_name="UpStepper-v0"
     experiment_name = env_name+"_"+"NSGC"
     seed=0
     use_cells=False
@@ -163,7 +163,7 @@ if __name__ == '__main__':
         #experiment_names=[experiment_name],
         env_names = [env_name],
         load_dir = exp_root,
-        generations=[25],
+        generations=[23],
         population_size=32,
         ranks = [i for i in range(32)], #not use when use_cells=True
         use_cells=use_cells,

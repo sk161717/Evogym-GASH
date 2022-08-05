@@ -30,8 +30,9 @@ def run_ga_tournament(
     num_cores,
     env_name,
     max_evaluations, 
+    is_pruning=False,
     dim_map=2,
-    n_niches=32,
+    n_niches=128,
     params=cm.default_params,
     ):
 
@@ -103,6 +104,7 @@ def run_ga_tournament(
     num_evaluations = 0
     generation = start_gen
     archive = {}  # init archive (empty)
+    novelty_archive=[]
 
     c = cm.cvt(n_niches, dim_map,
                params['cvt_samples'], params['cvt_use_cache'])
@@ -155,7 +157,7 @@ def run_ga_tournament(
         #better parallel
         group = mp.Group()
         for structure in structures[len(structures)-pop_size:]:
-            ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name)
+            ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name,experiment_name,generation,is_pruning)
             group.add_job(run_ppo, ppo_args, callback=structure.set_reward)
             num_evaluations+=1
         group.run_jobs(num_cores)
@@ -165,6 +167,9 @@ def run_ga_tournament(
             structure.compute_fitness()
             structure.desc=cm.calc_desc(structure.body)
             __add_to_archive(structure,structure.desc,archive,kdt)
+        
+        compute_novelty_for_list(structures[len(structures)-pop_size:],novelty_archive,pop_size)
+        save_evaluated_score(experiment_name,generation,structures[len(structures)-pop_size:])
 
         save_archive(archive,generation,experiment_name)
 
@@ -181,7 +186,7 @@ def run_ga_tournament(
         add_lineage(structures,experiment_name,generation)
 
          ### CHECK EARLY TERMINATION ###
-        if num_evaluations > max_evaluations:
+        if num_evaluations >= max_evaluations:
             print(f'Trained exactly {num_evaluations} robots')
             return
 

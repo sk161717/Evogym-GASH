@@ -7,13 +7,15 @@ from ga.run_tournament import run_ga_tournament
 from ppo.arguments import get_args
 
 if __name__ == "__main__":
-    seed = 20
+    args=get_args()
+    seed = args.randseed
     random.seed(seed)
     np.random.seed(seed)
-    env_name="PlatformJumper-v0"
+    env_name="UpStepper-v0"
 
     is_tournament=True
     is_transfer=False
+    is_pruning=False
     transfer_gen=100
     suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
 
@@ -24,9 +26,10 @@ if __name__ == "__main__":
             structure_shape = (5,5),
             pop_size = 32,
             train_iters = 1000,
-            num_cores = 8,
+            num_cores = 4,
             env_name=env_name,
-            max_evaluations = 3000,
+            max_evaluations = 1024,
+            is_pruning=is_pruning,
         )
     else:
         run_ga(

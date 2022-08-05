@@ -6,10 +6,10 @@ from ga.run_multi import run_multi_ga
 from ppo.arguments import get_args
 
 if __name__ == "__main__":
-    seed = 0
+    seed = 1
     random.seed(seed)
     np.random.seed(seed)
-    env_name1="Walker-v0"
+    env_name1="UpStepper-v0"
     env_name2="NSGC"
     is_ist=False
     is_two_env_parallel=False

@@ -160,6 +160,7 @@ def run_single_ME(experiment_name, structure_shape,
     kdt = KDTree(c, leaf_size=30, metric='euclidean')
 
     archive = {}  # init archive (empty)
+    novelty_archive=[]
     generation = start_gen  # number of evaluations since the beginning
     curr_evaluation=0
 
@@ -239,16 +240,13 @@ def run_single_ME(experiment_name, structure_shape,
         for x in X:
             __add_to_archive(x, x.desc, archive, kdt)
         
-        
+        compute_novelty_for_list(X,novelty_archive,batch_size)
+        save_evaluated_score(experiment_name,generation,X)
 
         ######################save data per generation##########################
 
-        save_path_structure = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation),
-                                           "structure")
-        try:
-            os.makedirs(save_path_structure)
-        except:
-            pass
+        save_evaluated_structures(experiment_name,generation,X)
+
 
         #save population hash for resuming training
         save_polulation_hashes(population_structure_hashes,generation,experiment_name)
@@ -257,21 +255,8 @@ def run_single_ME(experiment_name, structure_shape,
         structures = [structure for structure in archive.values()]
         structures = sorted(structures, key=lambda structure: structure.fitness, reverse=True)
 
-        ### SAVE POPULATION DATA ###
-        for i in range(len(structures)):
-            temp_path = os.path.join(save_path_structure, str(structures[i].label))
-            np.savez(temp_path, structures[i].body, structures[i].connections)
-
-        # SAVE RANKING TO FILE
-        temp_path = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation), "output.txt")
-        f = open(temp_path, "w")
-
-        out = ""
-        for structure in structures:
-            out += str(structure.label) + "\t\t" + str(structure.fitness) + "\n"
-        out+="current evaluation: "+str(curr_evaluation)+"\n"
-        f.write(out)
-        f.close()
+        
+        write_output(structures,experiment_name,generation,curr_evaluation)
 
         # plot fitness graph 
         plot_graph(experiment_name,generation,is_multi=False)

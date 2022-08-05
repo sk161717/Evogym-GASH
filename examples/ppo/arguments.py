@@ -155,6 +155,8 @@ def get_args():
         action='store_true',
         default=True,
         help='use a linear schedule on the learning rate')
+    parser.add_argument(
+        '--randseed', type=int, default=1, help='random seed (default: 1)')
     args = parser.parse_args()
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()

@@ -1,4 +1,4 @@
-import os, sys
+import os, sys,time
 sys.path.insert(1, os.path.join(sys.path[0], 'externals', 'pytorch_a2c_ppo_acktr_gail'))
 
 import numpy as np
@@ -15,6 +15,8 @@ from ppo import utils
 from ppo.arguments import get_args
 from ppo.evaluate import evaluate
 from ppo.envs import make_vec_envs
+from utils.algo_utils import save_eval_history,is_pruned,is_stop
+import utils.pruning_params as pp
 
 from a2c_ppo_acktr import algo
 from a2c_ppo_acktr.algo import gail
@@ -31,6 +33,9 @@ def run_ppo(
     termination_condition, 
     saving_convention, 
     override_env_name = None,
+    expr_name=None,
+    gen=None,
+    is_pruning=False,
     verbose = True):
 
     assert (structure == None) == (termination_condition == None) and (structure == None) == (saving_convention == None)
@@ -40,6 +45,7 @@ def run_ppo(
     args = get_args()
     if override_env_name:
         args.env_name = override_env_name
+    eval_history=[]
 
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed_all(args.seed)
@@ -222,7 +228,10 @@ def run_ppo(
                     print(f'Evaluated {saving_convention[1]} using {args.num_evals} episodes. Mean reward: {np.mean(determ_avg_reward)}\n')
                 else:
                     print(f'Evaluated using {args.num_evals} episodes. Mean reward: {np.mean(determ_avg_reward)}\n')
-
+            
+            if expr_name!=None:   
+                eval_history.append(determ_avg_reward)
+               
             if determ_avg_reward > max_determ_avg_reward:
                 max_determ_avg_reward = determ_avg_reward
 
@@ -242,7 +251,20 @@ def run_ppo(
             if termination_condition(j):
                 if verbose:
                     print(f'{saving_convention} has met termination condition ({j})...terminating...\n')
+                if expr_name!=None:   
+                    save_eval_history(expr_name,gen,eval_history,saving_convention[1])
                 return max_determ_avg_reward
+        if is_pruning and (j==pp.params["pruning_timing1"] or j==pp.params["pruning_timing2"]):
+            print('get into pruning section iters {}, index {} '.format(j,saving_convention[1]))
+            save_eval_history(expr_name,gen,eval_history,saving_convention[1],j)
+            while is_stop(j,expr_name,gen):
+                print('now stopping index : '+str(saving_convention[1]))
+                time.sleep(10)
+            if is_pruned(saving_convention[1],j,expr_name,gen,args.eval_interval):
+                print('is pruned index : '+str(saving_convention[1]))
+                return max_determ_avg_reward
+
+
 
 #python ppo_main_test.py --env-name "roboticgamedesign-v0" --algo ppo --use-gae --lr 2.5e-4 --clip-param 0.1 --value-loss-coef 0.5 --num-processes 1 --num-steps 128 --num-mini-batch 4 --log-interval 1 --use-linear-lr-decay --entropy-coef 0.01
 #python ppo.py --env-name "roboticgamedesign-v0" --algo ppo --use-gae --lr 2.5e-4 --clip-param 0.1 --value-loss-coef 0.5 --num-processes 8 --num-steps 128 --num-mini-batch 4 --log-interval 1 --use-linear-lr-decay --entropy-coef 0.01 --log-dir "logs/"

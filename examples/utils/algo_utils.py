@@ -4,6 +4,9 @@ from evogym import is_connected, has_actuator, get_full_connectivity, draw, get_
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+import statistics
+import pandas as pd
+import utils.pruning_params as pp
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.join(curr_dir, '..')
 
@@ -26,6 +29,8 @@ class Structure():
 
         self.label = label
         self.parent_label=parent_label
+
+        self.eval_history=[]
 
     def compute_fitness(self):
 
@@ -249,7 +254,7 @@ def write_output(structures,expr_name,gen,num_evaluations):
 
     out = ""
     for structure in structures:
-        out += str(structure.label) + "\t\t" + str(structure.fitness) + "\n"
+        out += str(structure.label) + "\t\t" + str(structure.fitness) + "\t\t"+str(structure.fitness2) + "\n"
     out+="current evaluation: "+str(num_evaluations)+"\n"
     f.write(out)
     f.close()
@@ -325,9 +330,6 @@ def plot_one_graph(expr_name,gen,fitness_list,evaluation_list,index=1,is_eval_ba
     plt.xlabel('evaluations' if is_eval_base else 'evaluated design')
     plt.ylabel('score of '+str(index))
 
-    # 凡例の表示
-    plt.legend()
-
     path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'score'+str(index)+'.pdf')
     # プロット表示(設定の反映)
     plt.savefig(path)
@@ -342,24 +344,133 @@ def calc_edit_distance(structure1,structure2):
     return dist
 
 
-def compute_novelty(X):
-    k=5
+def compute_novelty(X,novelty_archive):
+    k=3
+    novelty_threshold=10
     pop_size=X.shape[0]
-    dist_matrix=np.zeros((pop_size,pop_size))
-    for i in range(pop_size):
-        for j in range(pop_size):
-            if dist_matrix[i][j]==0 and dist_matrix[j][i]==0:
-                dist_matrix[i][j]=calc_edit_distance(X[i][0].body,X[j][0].body)
-            elif dist_matrix[i][j]==0:
-                dist_matrix[i][j]=dist_matrix[j][i]
-            elif dist_matrix[j][i]==0:
-                dist_matrix[j][i]=dist_matrix[i][j]
     f2=np.full((pop_size,1),None,dtype=object)
+
+    if len(novelty_archive)==0:
+        for i in range(pop_size):
+            novelty_archive.append(X[i][0])
+            f2[i][0]=novelty_threshold
+        return f2
+
     for i in range(pop_size):
-        topk=np.sort(dist_matrix[i])[1:k+1]
-        f2[i][0]=np.average(topk)
+        dist_arr=[]
+        for j in range(len(novelty_archive)):
+                dist_arr.append(calc_edit_distance(X[i][0].body,novelty_archive[j].body))
+
+        latter_index = k+1 if len(dist_arr)>k+1 else len(dist_arr)
+        topk=sorted(dist_arr)[:latter_index]
+        f2[i][0]=statistics.mean(topk)
+        # save archive
+        if f2[i][0]>novelty_threshold:
+            novelty_archive.append(X[i][0])
+    print('archive size:',len(novelty_archive))
     return f2
 
+def compute_novelty_for_list(structures,novelty_archive,pop_size):
+    X = np.full((pop_size, 1), None, dtype=object)
+    for i in range(pop_size):
+        X[i][0]=structures[i]
+    f2=compute_novelty(X,novelty_archive)
+    for i in range(pop_size):
+        structures[i].fitness2=f2[i][0]
+
+def save_eval_history(expr_name,gen,eval_history,label,curr_evals=None):
+    if curr_evals==None:
+        path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history.txt')
+    else:
+        path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt')
+    out = ""
+    str_eval_hist=list(map(str,eval_history))
+    out+= str(label) +'\t\t'+ '\t\t'.join(str_eval_hist) + '\n'
+    with open(path,'a') as f:
+        f.write(out)
+
+def save_evaluated_structures(expr_name,generation,structures):
+    save_path_structure = os.path.join(root_dir, "saved_data", expr_name, "generation_" + str(generation), "structure")
+    try:
+        os.makedirs(save_path_structure)
+    except:
+        pass
+
+    ### SAVE POPULATION DATA ###
+    for i in range(len(structures)):
+        temp_path = os.path.join(save_path_structure, str(structures[i].label))
+        np.savez(temp_path, structures[i].body, structures[i].connections)
+
+def save_evaluated_score(expr_name,gen,structures):
+    temp_path = os.path.join(root_dir, "saved_data", expr_name, "generation_" + str(gen), "evaluated_score.txt")
+    f = open(temp_path, "w")
+
+    out = ""
+    for structure in structures:
+        out += str(structure.label) + "\t\t" + str(structure.fitness) + "\t\t"+str(structure.fitness2) + "\n"
+    f.write(out)
+    f.close()
+
+def is_pruned(label,curr_evals,expr_name,gen,eval_interval):
+    data_arr=[]
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt')
+    
+    with open(path) as f:
+        for line in f:
+            items=list(map(float,line.split('\t\t')))
+            if len(items)!=(curr_evals//eval_interval+1):
+                items=items[0:1]+items[2:]
+            data_arr.append(items)
+            
+    df=pd.DataFrame(data_arr)
+    start_index=curr_evals//eval_interval-4
+    end_index=curr_evals//eval_interval+1
+    
+    
+    df.iloc[:,0]=df.iloc[:,0].apply(int)
+    df.loc[:,'var']=df.iloc[:,start_index:end_index].var(axis=1)
+    df.loc[:,'max']=df.iloc[:,1:end_index].max(axis=1)
+    df.loc[:,'var_rank']=df['var'].rank(ascending=False)
+    df.loc[:,'max_rank']=df['max'].rank(ascending=False)
+    df.loc[:,'var_max']=df.loc[:,'var_rank']*df.loc[:,'max_rank']
+    df.loc[:,'vm_rank']=df['var_max'].rank(method='first',ascending=True)
+    
+    rank=df[df.iloc[:,0]==label].loc[:,'vm_rank'].iloc[0]
+    if curr_evals==pp.params["pruning_timing1"]:
+        if rank>pp.params["timing1_border"]:
+            return True
+        else:
+            return False
+    elif curr_evals==pp.params["pruning_timing2"]:
+        if rank>pp.params["timing2_border"]:
+            return True
+        else:
+            return False
+    else:
+        print('Error : unexpected curr_evals')
+        exit(1)
+
+
+def is_stop(curr_evals,expr_name,gen,pop_size=pp.params['pop_size']):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt')
+    
+    with open(path) as f:
+        file_length=len(f.readlines())
+
+    required=pop_size if curr_evals==pp.params['pruning_timing1'] else pp.params['timing1_border']
+
+    if file_length<required:
+        return True
+    elif file_length==required:
+        return False
+    elif file_length>required:
+        print('Error : file length exceeds required {}'.format(required))
+        exit(1)
+        
+
+
+    
+            
 
 if __name__ == "__main__":
 

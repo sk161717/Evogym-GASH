@@ -1,5 +1,4 @@
 import os
-from venv import create
 import numpy as np
 import shutil
 import random
@@ -22,6 +21,9 @@ from evogym import sample_robot, hashable
 import utils.mp_group as mp
 from utils.algo_utils import *
 from make_gifs_multi import Job
+from pyME.map_elites.single_cvt import __add_to_archive
+from pyME.map_elites import common as cm
+from sklearn.neighbors import KDTree
 from pymoo.core.sampling import Sampling
 from pymoo.core.crossover import Crossover
 from pymoo.core.mutation import Mutation
@@ -37,13 +39,32 @@ unique_label=UniqueLabel()
 
 class MyProblem(Problem):
 
-    def __init__(self,algorithm,tc,num_cores,env_name1,env_name2,is_two_env_parallel=False,is_NSGC=False) -> None:
+    def __init__(
+        self,
+        algorithm,
+        tc,
+        num_cores,
+        env_name1,
+        env_name2,
+        novelty_archive,
+        archive,
+        kdt,
+        __add_to_archive,
+        experiment_name,
+        is_two_env_parallel=False,
+        is_NSGC=False) -> None:
+
         super().__init__(n_var=1, n_obj=2, n_constr=0)
         self.algorithm=algorithm
         self.tc = tc
         self.num_cores=num_cores
         self.env_name1=env_name1
         self.env_name2=env_name2
+        self.novelty_archive=novelty_archive
+        self.archive=archive
+        self.kdt=kdt
+        self.__add_to_archive = __add_to_archive
+        self.experiment_name=experiment_name
         self.is_two_env_parallel=is_two_env_parallel
         self.is_NSGC=is_NSGC
 
@@ -83,19 +104,26 @@ class MyProblem(Problem):
     
     def NSGC(self,X,env_name,save_path_controller):
         global curr_evaluation
+        global generation
+
         group = mp.Group()
         for x in X:
             ppo_args = ((x[0].body, x[0].connections), self.tc, (save_path_controller, x[0].label),env_name)
             group.add_job(run_ppo, ppo_args, callback=x[0].set_reward)
             curr_evaluation+=1
         group.run_jobs(self.num_cores)
+        save_evaluated_structures(self.experiment_name,generation,X.ravel())
 
         f1=np.full((X.shape[0],1),None,dtype=object)
-        f2=compute_novelty(X)
+        f2=compute_novelty(X,self.novelty_archive)
         for i,x in enumerate(X):
             f1[i][0]=-x[0].fitness
+             #for saving in output.txt
             x[0].fitness2=f2[i][0]
             f2[i][0]=-f2[i][0]
+            x[0].desc=cm.calc_desc(x[0].body)
+            self.__add_to_archive(x[0],x[0].desc,self.archive,self.kdt)
+        save_evaluated_score(self.experiment_name,generation,X.ravel())
         return f1,f2
 
     def RunParallelEnv(self,X,env_name1,env_name2):
@@ -194,33 +222,23 @@ class MyMutation(Mutation):
         return X
 
 class MyCallback(Callback):
-        def __init__(self,experiment_name,is_NSGC) -> None:
+        def __init__(self,experiment_name,is_NSGC,archive,n_niches) -> None:
             super().__init__()
             self.experiment_name = experiment_name
             self.is_NSGC=is_NSGC
+            self.archive=archive
+            self.n_niches=n_niches
 
         def notify(self, algorithm):
             global generation
             global save_path_controller1
             global save_path_controller2
             global curr_evaluation
-            
-            ### MAKE GENERATION DIRECTORIES ###
-            save_path_structure = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "structure")
-            try:
-                os.makedirs(save_path_structure)
-            except:
-                pass
 
             save_polulation_hashes(population_structure_hashes,generation,self.experiment_name)
             
             structures=algorithm.pop.get("X")
             structures = sorted(structures, key=lambda structure: structure[0].fitness, reverse=True)
-
-            ### SAVE POPULATION DATA ###
-            for i in range (len(structures)):
-                temp_path = os.path.join(save_path_structure, str(structures[i][0].label))
-                np.savez(temp_path, structures[i][0].body, structures[i][0].connections)
             
             #SAVE RANKING TO FILE
             temp_path = os.path.join(root_dir, "saved_data", self.experiment_name, "generation_" + str(generation), "output.txt")
@@ -233,6 +251,7 @@ class MyCallback(Callback):
             f.write(out)
             f.close()
             plot_graph(self.experiment_name,generation,True)
+            cm.save_centroid_and_map(root_dir,self.experiment_name,generation,self.archive,self.n_niches)
             
             #SAVE LINEAGE TO FILE
             add_lineage(np.ravel(structures),self.experiment_name,generation)
@@ -251,9 +270,6 @@ class MyCallback(Callback):
             create_controller_dir(self.experiment_name,generation,self.is_NSGC)
             
             
-
-
-
 def run_multi_ga(
     experiment_name, 
     structure_shape, 
@@ -266,7 +282,10 @@ def run_multi_ga(
     seed=0,
     is_two_env_parallel=False,
     is_ist=False,
-    is_NSGC=False):
+    is_NSGC=False,
+    dim_map=2,
+    n_niches=128,
+    params=cm.default_params,):
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
     start_gen = 0
@@ -336,6 +355,13 @@ def run_multi_ga(
         
         f.close()
 
+    archive = {}
+    novelty_archive=[]
+
+    c = cm.cvt(n_niches, dim_map,
+               params['cvt_samples'], params['cvt_use_cache'])
+    kdt = KDTree(c, leaf_size=30, metric='euclidean')
+
     #Multiobjective Initialization
     algorithm=NSGA2(
         pop_size=pop_size,
@@ -345,11 +371,11 @@ def run_multi_ga(
         eliminate_duplicates=False
     )
 
-    res = minimize(MyProblem(algorithm,tc,num_cores,env_name1,env_name2,is_two_env_parallel,is_NSGC),
+    res = minimize(MyProblem(algorithm,tc,num_cores,env_name1,env_name2,novelty_archive,archive,kdt,__add_to_archive,experiment_name,is_two_env_parallel,is_NSGC),
                 algorithm,
                 ('n_gen',total_generation),
                 seed=seed,
-                callback=MyCallback(experiment_name,is_NSGC),
+                callback=MyCallback(experiment_name,is_NSGC,archive,n_niches),
                 verbose=False)
 
     plot = Scatter(title = "Objective Space", labels="f")
