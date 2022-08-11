@@ -428,27 +428,19 @@ def is_pruned(label,curr_evals,expr_name,gen,eval_interval):
     
     
     df.iloc[:,0]=df.iloc[:,0].apply(int)
-    df.loc[:,'var']=df.iloc[:,start_index:end_index].var(axis=1)
+    #df.loc[:,'var']=df.iloc[:,start_index:end_index].var(axis=1)
     df.loc[:,'max']=df.iloc[:,1:end_index].max(axis=1)
-    df.loc[:,'var_rank']=df['var'].rank(ascending=False)
+    #df.loc[:,'var_rank']=df['var'].rank(ascending=False)
     df.loc[:,'max_rank']=df['max'].rank(ascending=False)
-    df.loc[:,'var_max']=df.loc[:,'var_rank']*df.loc[:,'max_rank']
+    #df.loc[:,'var_max']=df.loc[:,'var_rank']*df.loc[:,'max_rank']
+    df.loc[:,'var_max']=df.loc[:,'max_rank']
     df.loc[:,'vm_rank']=df['var_max'].rank(method='first',ascending=True)
     
     rank=df[df.iloc[:,0]==label].loc[:,'vm_rank'].iloc[0]
-    if curr_evals==pp.params["pruning_timing1"]:
-        if rank>pp.params["timing1_border"]:
-            return True
-        else:
-            return False
-    elif curr_evals==pp.params["pruning_timing2"]:
-        if rank>pp.params["timing2_border"]:
-            return True
-        else:
-            return False
+    if rank > pp.eval_border_dict[curr_evals]:
+        return True
     else:
-        print('Error : unexpected curr_evals')
-        exit(1)
+        return False
 
 
 def is_stop(curr_evals,expr_name,gen,pop_size=pp.params['pop_size']):
@@ -456,8 +448,10 @@ def is_stop(curr_evals,expr_name,gen,pop_size=pp.params['pop_size']):
     
     with open(path) as f:
         file_length=len(f.readlines())
+    
+    
 
-    required=pop_size if curr_evals==pp.params['pruning_timing1'] else pp.params['timing1_border']
+    required=pp.eval_require_dict[curr_evals] 
 
     if file_length<required:
         return True

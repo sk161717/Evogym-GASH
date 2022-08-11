@@ -15,20 +15,20 @@ if __name__ == "__main__":
 
     is_tournament=True
     is_transfer=False
-    is_pruning=False
+    is_pruning=True
     transfer_gen=100
     suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
 
 
     if is_tournament:
         run_ga_tournament(
-            experiment_name = env_name+"_TournamentGA"+suffix+'_seed:'+str(seed),
+            experiment_name = env_name+"_TournamentSuHaGA"+suffix+'_seed:'+str(seed),
             structure_shape = (5,5),
             pop_size = 32,
             train_iters = 1000,
-            num_cores = 4,
+            num_cores = 32,
             env_name=env_name,
-            max_evaluations = 1024,
+            max_evaluations = 6000,
             is_pruning=is_pruning,
         )
     else:

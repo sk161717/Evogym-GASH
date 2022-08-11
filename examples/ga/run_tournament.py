@@ -128,7 +128,7 @@ def run_ga_tournament(
         num_evaluations=calc_curr_evaluation(generation,pop_size,pop_size)
         unique_label.set_label_start_for_resuming(num_evaluations+pop_size)
         assert len(structures) == 2*pop_size
-        print(structures)
+        
     
    
     while (num_evaluations < max_evaluations):

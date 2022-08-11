@@ -254,11 +254,11 @@ def run_ppo(
                 if expr_name!=None:   
                     save_eval_history(expr_name,gen,eval_history,saving_convention[1])
                 return max_determ_avg_reward
-        if is_pruning and (j==pp.params["pruning_timing1"] or j==pp.params["pruning_timing2"]):
+        if is_pruning and (j==pp.params["pruning_timing1"] or j==pp.params["pruning_timing2"] or j==pp.params["pruning_timing3"] or j==pp.params["pruning_timing4"]):
             print('get into pruning section iters {}, index {} '.format(j,saving_convention[1]))
             save_eval_history(expr_name,gen,eval_history,saving_convention[1],j)
             while is_stop(j,expr_name,gen):
-                print('now stopping index : '+str(saving_convention[1]))
+                print('now stopping index : '+str(saving_convention[1]) + 'at iteration '+str(j))
                 time.sleep(10)
             if is_pruned(saving_convention[1],j,expr_name,gen,args.eval_interval):
                 print('is pruned index : '+str(saving_convention[1]))
