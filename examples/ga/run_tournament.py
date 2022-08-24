@@ -105,6 +105,7 @@ def run_ga_tournament(
     generation = start_gen
     archive = {}  # init archive (empty)
     novelty_archive=[]
+    div_log=[]
 
     c = cm.cvt(n_niches, dim_map,
                params['cvt_samples'], params['cvt_use_cache'])
@@ -178,7 +179,11 @@ def run_ga_tournament(
 
         #SAVE RANKING TO FILE
         write_output(structures,experiment_name,generation,num_evaluations)
-        plot_graph(experiment_name,generation,False)
+        div_log.append(compute_diversity(structures))
+        fitness_list,evaluation_list=max_fit_list_single(experiment_name,generation)
+        plot_one_graph(experiment_name,generation,fitness_list,evaluation_list)
+        plot_one_graph(experiment_name,generation,div_log,evaluation_list,target='div')
+        save_single_array_val(div_log,experiment_name,generation,'div')
 
         cm.save_centroid_and_map(root_dir,experiment_name,generation,archive,n_niches)
 

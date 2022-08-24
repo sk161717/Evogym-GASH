@@ -309,17 +309,25 @@ def max_fit_list_multi(expr_name,generation):
             fitness2_gen.append(max(fitnesses2))
     return fitness1_gen,fitness2_gen,evaluation_list
 
+def save_single_array_val(array,expr_name,gen,target):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),target+'.txt')
+    with open(path,'w') as f:
+        str_array=list(map(str,array))
+        output=','.join(str_array)
+        f.write(output)
+
+#max_fit_list functionとplot_one_graph functionは元のコード内で分けて使うこと推奨(->plot_graph関数は非推奨)
 def plot_graph(expr_name,gen,is_multi,is_eval_base=True):
     if is_multi:
         fitness1_list,fitness2_list,evaluation_list=max_fit_list_multi(expr_name,gen)
-        plot_one_graph(expr_name,gen,fitness1_list,evaluation_list)
-        plot_one_graph(expr_name,gen,fitness2_list,evaluation_list,index=2)
+        plot_one_graph(expr_name,gen,fitness1_list,evaluation_list,index='1')
+        plot_one_graph(expr_name,gen,fitness2_list,evaluation_list,index='2')
     else:    
         fitness1_list,evaluation_list=max_fit_list_single(expr_name,gen)
         plot_one_graph(expr_name,gen,fitness1_list,evaluation_list)
     
 
-def plot_one_graph(expr_name,gen,fitness_list,evaluation_list,index=1,is_eval_base=True):
+def plot_one_graph(expr_name,gen,fitness_list,evaluation_list,index='',target='score',is_eval_base=True):
     fig = plt.figure(figsize=(12, 8)) #...1
     
     # Figure内にAxesを追加()
@@ -328,9 +336,9 @@ def plot_one_graph(expr_name,gen,fitness_list,evaluation_list,index=1,is_eval_ba
         evaluation_list=np.array(evaluation_list)/2
     ax.plot(evaluation_list, fitness_list) 
     plt.xlabel('evaluations' if is_eval_base else 'evaluated design')
-    plt.ylabel('score of '+str(index))
+    plt.ylabel(target+' of '+str(index))
 
-    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'score'+str(index)+'.pdf')
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),target+index+'.pdf')
     # プロット表示(設定の反映)
     plt.savefig(path)
 
@@ -342,6 +350,17 @@ def calc_edit_distance(structure1,structure2):
             if structure1[i][j]!=structure2[i][j]:
                 dist+=1
     return dist
+
+def compute_diversity(structures):
+    pop_size=len(structures)
+    div=0
+    for i in range(pop_size):
+        div_i=0
+        for j in range(pop_size):
+            div_i+=calc_edit_distance(structures[i].body,structures[j].body)
+        div_i=div_i/pop_size
+        div+=div_i
+    return div/pop_size
 
 
 def compute_novelty(X,novelty_archive):
