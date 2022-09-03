@@ -15,8 +15,8 @@ from ppo import utils
 from ppo.arguments import get_args
 from ppo.evaluate import evaluate
 from ppo.envs import make_vec_envs
-from utils.algo_utils import save_eval_history,is_pruned,is_stop
-import utils.pruning_params as pp
+from utils.algo_utils import save_eval_history,is_pruned,is_stop,refer_env_eval_step, save_steps
+from utils.pruning_params import Params
 
 from a2c_ppo_acktr import algo
 from a2c_ppo_acktr.algo import gail
@@ -36,6 +36,7 @@ def run_ppo(
     expr_name=None,
     gen=None,
     is_pruning=False,
+    params=None,
     verbose = True):
 
     assert (structure == None) == (termination_condition == None) and (structure == None) == (saving_convention == None)
@@ -229,7 +230,7 @@ def run_ppo(
                 else:
                     print(f'Evaluated using {args.num_evals} episodes. Mean reward: {np.mean(determ_avg_reward)}\n')
             
-            if expr_name!=None:   
+            if expr_name!=None and j!=0:   
                 eval_history.append(determ_avg_reward)
                
             if determ_avg_reward > max_determ_avg_reward:
@@ -253,14 +254,24 @@ def run_ppo(
                     print(f'{saving_convention} has met termination condition ({j})...terminating...\n')
                 if expr_name!=None:   
                     save_eval_history(expr_name,gen,eval_history,saving_convention[1])
+                    train_steps=args.num_processes*args.num_steps*j
+                    eval_steps=len(eval_history)*refer_env_eval_step(override_env_name)
+                    num_steps=train_steps+eval_steps
+                    save_steps(expr_name,gen,num_steps,saving_convention[1])
                 return max_determ_avg_reward
-        if is_pruning and (j==pp.params["pruning_timing1"] or j==pp.params["pruning_timing2"] or j==pp.params["pruning_timing3"] or j==pp.params["pruning_timing4"]):
+        
+        
+        if is_pruning and params.judge_timing(j):
             print('get into pruning section iters {}, index {} '.format(j,saving_convention[1]))
             save_eval_history(expr_name,gen,eval_history,saving_convention[1],j)
-            while is_stop(j,expr_name,gen):
-                print('now stopping index : '+str(saving_convention[1]) + 'at iteration '+str(j))
+            while is_stop(j,expr_name,gen,params):
+                print('now stopping index : '+str(saving_convention[1]) + ' at iteration '+str(j))
                 time.sleep(10)
-            if is_pruned(saving_convention[1],j,expr_name,gen,args.eval_interval):
+            if is_pruned(saving_convention[1],j,expr_name,gen,args.eval_interval,params):
+                train_steps=args.num_processes*args.num_steps*j
+                eval_steps=len(eval_history)*refer_env_eval_step(override_env_name)
+                num_steps=train_steps+eval_steps
+                save_steps(expr_name,gen,num_steps,saving_convention[1])
                 print('is pruned index : '+str(saving_convention[1]))
                 return max_determ_avg_reward
 

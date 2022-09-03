@@ -1,12 +1,13 @@
 import math
 import sys,os,random
+
+from sympy import root
 from evogym import is_connected, has_actuator, get_full_connectivity, draw, get_uniform
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import statistics
 import pandas as pd
-import utils.pruning_params as pp
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.join(curr_dir, '..')
 
@@ -172,6 +173,15 @@ def get_percent_survival_evals(curr_eval, max_evals):
     low = 0.0
     high = 0.6
     return ((max_evals-curr_eval-1)/(max_evals-1)) * (high-low) + low
+
+def get_percent_survival_from_score(curr_max,target_score):
+    low=0.0
+    high =0.6
+    return ((target_score-curr_max)/target_score)*(high-low) + low
+
+def get_pruning_rate(curr_max,target_score):
+    pass
+
 
 def total_robots_explored_breakpoints_evals(pop_size, max_evals):
     
@@ -408,6 +418,12 @@ def save_eval_history(expr_name,gen,eval_history,label,curr_evals=None):
     with open(path,'a') as f:
         f.write(out)
 
+def save_steps(expr_name,gen,step,label):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'steps.txt')
+    out=str(label) +'\t\t'+str(step)+'\n'
+    with open(path,'a') as f:
+        f.write(out)
+
 def save_evaluated_structures(expr_name,generation,structures):
     save_path_structure = os.path.join(root_dir, "saved_data", expr_name, "generation_" + str(generation), "structure")
     try:
@@ -430,7 +446,7 @@ def save_evaluated_score(expr_name,gen,structures):
     f.write(out)
     f.close()
 
-def is_pruned(label,curr_evals,expr_name,gen,eval_interval):
+def is_pruned(label,curr_evals,expr_name,gen,eval_interval,params):
     data_arr=[]
     path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt')
     
@@ -449,28 +465,28 @@ def is_pruned(label,curr_evals,expr_name,gen,eval_interval):
     df.iloc[:,0]=df.iloc[:,0].apply(int)
     #df.loc[:,'var']=df.iloc[:,start_index:end_index].var(axis=1)
     df.loc[:,'max']=df.iloc[:,1:end_index].max(axis=1)
+    #df.loc[:,'mean']=df.iloc[:,1:end_index].mean(axis=1)
     #df.loc[:,'var_rank']=df['var'].rank(ascending=False)
     df.loc[:,'max_rank']=df['max'].rank(ascending=False)
+    #df.loc[:,'mean_rank']=df['mean'].rank(ascending=False)
     #df.loc[:,'var_max']=df.loc[:,'var_rank']*df.loc[:,'max_rank']
     df.loc[:,'var_max']=df.loc[:,'max_rank']
     df.loc[:,'vm_rank']=df['var_max'].rank(method='first',ascending=True)
     
     rank=df[df.iloc[:,0]==label].loc[:,'vm_rank'].iloc[0]
-    if rank > pp.eval_border_dict[curr_evals]:
+    if rank > params.eval_border_dict[curr_evals]:
         return True
     else:
         return False
 
 
-def is_stop(curr_evals,expr_name,gen,pop_size=pp.params['pop_size']):
+def is_stop(curr_evals,expr_name,gen,params):
     path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt')
     
     with open(path) as f:
         file_length=len(f.readlines())
-    
-    
 
-    required=pp.eval_require_dict[curr_evals] 
+    required=params.eval_require_dict[curr_evals] 
 
     if file_length<required:
         return True
@@ -479,6 +495,17 @@ def is_stop(curr_evals,expr_name,gen,pop_size=pp.params['pop_size']):
     elif file_length>required:
         print('Error : file length exceeds required {}'.format(required))
         exit(1)
+    
+def refer_env_eval_step(env_name):
+    environment_steps=\
+    {
+        "Walker-v0":500,
+        "UpStepper-v0":600,
+        "PlatformJumper-v0":1000,
+    }
+    return environment_steps[env_name]
+
+
         
 
 

@@ -11,21 +11,22 @@ if __name__ == "__main__":
     seed = args.randseed
     random.seed(seed)
     np.random.seed(seed)
-    env_name="Walker-v0"
+    env_name="UpStepper-v0"
 
-    is_tournament=True
+    is_tournament=False
     is_transfer=False
     is_pruning=False
     transfer_gen=100
     suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
+    suffix="SuHa" if is_pruning else ""
 
 
     if is_tournament:
         run_ga_tournament(
-            experiment_name = env_name+"_TournamentGA"+suffix+'_seed:'+str(seed),
+            experiment_name = env_name+"_Tournament"+suffix+"GA_seed:"+str(seed),
             structure_shape = (5,5),
             pop_size = 4,
-            train_iters = 50,
+            train_iters = 200,
             num_cores = 4,
             env_name=env_name,
             max_evaluations = 1000,
@@ -33,16 +34,12 @@ if __name__ == "__main__":
         )
     else:
         run_ga(
-            experiment_name = env_name+"_GA"+suffix+'_seed:'+str(seed),
+            experiment_name = env_name+"_"+suffix+"GA"+'_seed:'+str(seed),
             structure_shape = (5,5),
-            pop_size = 40,
+            pop_size = 32,
             train_iters = 1000,
-            num_cores = 32,
+            num_cores = 4,
             env_name=env_name,
-            dim_map=2,
-            n_niches=128,
-            max_evaluations = 3000,
-            is_transfer=is_transfer,
-            transfer_expr_name='Jumper-v0_GA',
-            transfer_gen=transfer_gen,
+            max_evaluations = 600,
+            is_pruning=is_pruning,
         )

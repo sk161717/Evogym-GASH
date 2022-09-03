@@ -18,14 +18,18 @@ from sklearn.neighbors import KDTree
 from ppo import run_ppo
 from evogym import sample_robot, hashable
 import utils.mp_group as mp
-from utils.algo_utils import get_percent_survival_evals, mutate, TerminationCondition, Structure,save_archive,load_archive,load_evaluation
+from utils.algo_utils import *
+from utils.pruning_params import Params
 
 def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         env_name,
-        dim_map,
-        n_niches, 
         max_evaluations, 
-        params=cm.default_params,
+        is_pruning=False,
+        dim_map=2,
+        n_niches=128, 
+        target_score=None,
+        survival_rate_from_score=False,
+        cm_params=cm.default_params,
         is_transfer=False,
         transfer_expr_name=None,
         transfer_gen=None,):
@@ -33,6 +37,7 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
     start_gen = 0
+    unique_label = UniqueLabel()
 
     ### DEFINE TERMINATION CONDITION ###    
     tc = TerminationCondition(train_iters)
@@ -98,9 +103,12 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
     num_evaluations = 0
     generation = 0
     archive = {}  # init archive (empty)
+    curr_max=0
+    params=Params()
+    div_log=[]
 
     c = cm.cvt(n_niches, dim_map,
-               params['cvt_samples'], params['cvt_use_cache'])
+               cm_params['cvt_samples'], cm_params['cvt_use_cache'])
     kdt = KDTree(c, leaf_size=30, metric='euclidean')
     
     #generate a population
@@ -112,7 +120,7 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
                 while (hashable(temp_structure[0]) in population_structure_hashes):
                     temp_structure = sample_robot(structure_shape)
 
-                structures.append(Structure(*temp_structure, i))
+                structures.append(Structure(*temp_structure, unique_label.give_label(),-1))
                 population_structure_hashes[hashable(temp_structure[0])] = True
                 num_evaluations += 1
         else:
@@ -147,8 +155,11 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
 
     while True:
 
-        ### UPDATE NUM SURVIORS ###			
-        percent_survival = get_percent_survival_evals(num_evaluations, max_evaluations)
+        ### UPDATE NUM SURVIORS ###	
+        if survival_rate_from_score:
+            percent_survival= get_percent_survival_from_score(curr_max,target_score)
+        else:		
+            percent_survival = get_percent_survival_evals(num_evaluations, max_evaluations)
         num_survivors = max(2, math.ceil(pop_size * percent_survival))
 
 
@@ -175,22 +186,28 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
 
         #better parallel
         group = mp.Group()
+        num_evaluated=sum([0 if structure.is_survivor else 1 for structure in structures])
+        params.calc_params_interactivly(num_evaluated)
         for structure in structures:
 
             if structure.is_survivor:
                 save_path_controller_part = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation), "controller",
                     "robot_" + str(structure.label) + "_controller" + ".pt")
                 save_path_controller_part_old = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation-1), "controller",
-                    "robot_" + str(structure.prev_gen_label) + "_controller" + ".pt")
+                    "robot_" + str(structure.label) + "_controller" + ".pt")
                 
                 print(f'Skipping training for {save_path_controller_part}.\n')
+                
+                
                 try:
                     shutil.copy(save_path_controller_part_old, save_path_controller_part)
                 except:
-                    print(f'Error coppying controller for {save_path_controller_part}.\n')
+                    print(f'Error copying controller for {save_path_controller_part}.\n')
+                
             else:        
-                ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name)
+                ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name,experiment_name,generation,is_pruning,params)
                 group.add_job(run_ppo, ppo_args, callback=structure.set_reward)
+        
 
         group.run_jobs(num_cores)
 
@@ -207,26 +224,27 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         save_archive(archive,generation,experiment_name)
 
         structures = sorted(structures, key=lambda structure: structure.fitness, reverse=True)
-
-        #SAVE RANKING TO FILE
-        temp_path = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(generation), "output.txt")
-        f = open(temp_path, "w")
-
-        out = ""
-        for structure in structures:
-            out += str(structure.label) + "\t\t" + str(structure.fitness) + "\n"
-        out+="current evaluation: "+str(num_evaluations)+"\n"
-        f.write(out)
-        f.close()
+        
+        write_output(structures,experiment_name,generation,num_evaluations)
+        div_log.append(compute_diversity(structures))
+        fitness_list,evaluation_list=max_fit_list_single(experiment_name,generation)
+        plot_one_graph(experiment_name,generation,fitness_list,evaluation_list)
+        plot_one_graph(experiment_name,generation,div_log,evaluation_list,target='div')
+        save_single_array_val(div_log,experiment_name,generation,'div')
 
         cm.save_centroid_and_map(root_dir,experiment_name,generation,archive,n_niches)
+
+        add_lineage(structures,experiment_name,generation)
+
+        curr_max=structures[0].fitness
+        
 
          ### CHECK EARLY TERMINATION ###
         if num_evaluations == max_evaluations:
             print(f'Trained exactly {num_evaluations} robots')
             return
 
-        print(f'FINISHED GENERATION {generation} - SEE TOP {round(percent_survival*100)} percent of DESIGNS:\n')
+        print(f'FINISHED GENERATION {generation} \n')
 
         ### CROSSOVER AND MUTATION ###
         # save the survivors
@@ -235,9 +253,7 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         #store survivior information to prevent retraining robots
         for i in range(num_survivors):
             structures[i].is_survivor = True
-            structures[i].prev_gen_label = structures[i].label
-            structures[i].label = i
-
+    
         # for randomly selected survivors, produce children (w mutations)
         num_children = 0
         while num_children < (pop_size - num_survivors) and num_evaluations < max_evaluations:
@@ -248,7 +264,7 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
             if child != None and hashable(child[0]) not in population_structure_hashes:
                 
                 # overwrite structures array w new child
-                structures[num_survivors + num_children] = Structure(*child, num_survivors + num_children)
+                structures[num_survivors + num_children] = Structure(*child, unique_label.give_label(),survivors[parent_index[0]].label)
                 population_structure_hashes[hashable(child[0])] = True
                 num_children += 1
                 num_evaluations += 1
