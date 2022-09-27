@@ -15,10 +15,15 @@ if __name__ == "__main__":
 
     is_tournament=False
     is_transfer=False
-    is_pruning=False
+    is_pruning=True
+    robot_size=8
     transfer_gen=100
+    scale=1
     suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
-    suffix="SuHa" if is_pruning else ""
+    suffix="scale" if scale > 1 else ""
+    suffix+="SuHa" if is_pruning else ""
+    suffix+=str(robot_size)+'*'+str(robot_size) if robot_size!=5 else ''
+
 
 
     if is_tournament:
@@ -35,11 +40,12 @@ if __name__ == "__main__":
     else:
         run_ga(
             experiment_name = env_name+"_"+suffix+"GA"+'_seed:'+str(seed),
-            structure_shape = (5,5),
-            pop_size = 32,
+            structure_shape = (robot_size,robot_size),
+            pop_size = 32*scale,
             train_iters = 1000,
-            num_cores = 4,
+            num_cores = 32,
             env_name=env_name,
-            max_evaluations = 600,
+            max_evaluations = 3000,
             is_pruning=is_pruning,
+            scale=scale
         )

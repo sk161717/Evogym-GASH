@@ -1,3 +1,4 @@
+import json
 import math
 import sys,os,random
 
@@ -8,6 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import statistics
 import pandas as pd
+import glob
+
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.join(curr_dir, '..')
 
@@ -322,9 +325,22 @@ def max_fit_list_multi(expr_name,generation):
 def save_single_array_val(array,expr_name,gen,target):
     path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),target+'.txt')
     with open(path,'w') as f:
-        str_array=list(map(str,array))
-        output=','.join(str_array)
+        output=json.dumps(array)
         f.write(output)
+
+def load_single_array_val(expr_name,gen,target):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen-1),target+'.txt')
+    with open(path) as f:
+        content=f.read()
+        return json.loads(content)
+
+def remove_only_files(expr_name,gen):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'*.*')
+    files=glob.glob(path)
+    for file in files:
+        os.remove(file)
+
+
 
 #max_fit_list functionとplot_one_graph functionは元のコード内で分けて使うこと推奨(->plot_graph関数は非推奨)
 def plot_graph(expr_name,gen,is_multi,is_eval_base=True):
@@ -495,7 +511,7 @@ def is_stop(curr_evals,expr_name,gen,params):
     elif file_length>required:
         print('Error : file length exceeds required {}'.format(required))
         exit(1)
-    
+
 def refer_env_eval_step(env_name):
     environment_steps=\
     {
@@ -504,6 +520,46 @@ def refer_env_eval_step(env_name):
         "PlatformJumper-v0":1000,
     }
     return environment_steps[env_name]
+
+
+def calc_step_from_evaluated(evaluated):
+    step=0
+    eval_timing_arr=[1,2,4,8,16]
+    n=math.ceil(math.log2(evaluated))
+    pre_index=5-n
+    for i in range(n):
+        next_evaluated=math.ceil(evaluated/2.0) if evaluated>2 else 0
+        step+=eval_timing_arr[pre_index+i]*(evaluated-next_evaluated)
+        evaluated=next_evaluated
+    return step
+
+def calc_max_evaluations_in_GA(total_step):
+    return total_step/16
+
+def calc_step_from_evaluations(max_evaluations):
+    total_step=0
+    gen=0
+    pop_size=32
+    num_evaluations=0
+    num_survivors=0
+    
+    while True:
+        num_evaluated=pop_size-num_survivors
+        if (num_evaluations+num_evaluated) > max_evaluations:
+            num_evaluated=max_evaluations-num_evaluations
+        num_evaluations+=num_evaluated
+        total_step+=calc_step_from_evaluated(num_evaluated)
+        
+        if num_evaluations == max_evaluations:
+            break
+        
+        percent_survival = get_percent_survival_evals(num_evaluations, max_evaluations)
+        num_survivors = max(2, math.ceil(pop_size * percent_survival))
+        gen+=1
+    
+    print(gen,num_evaluations,total_step,calc_max_evaluations_in_GA(total_step))
+    
+    return calc_max_evaluations_in_GA(total_step)
 
 
         

@@ -1,9 +1,12 @@
 from json import load
 import os
+from tracemalloc import start
 import numpy as np
 import shutil
 import random
 import math
+import multiprocessing
+import json
 
 import sys
 curr_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +28,7 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         env_name,
         max_evaluations, 
         is_pruning=False,
+        scale=1,
         dim_map=2,
         n_niches=128, 
         target_score=None,
@@ -101,10 +105,10 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
     structures = []
     population_structure_hashes = {}
     num_evaluations = 0
-    generation = 0
+    generation = start_gen
     archive = {}  # init archive (empty)
     curr_max=0
-    params=Params()
+    params=Params(pop_size,scale,num_cores)
     div_log=[]
 
     c = cm.cvt(n_niches, dim_map,
@@ -137,21 +141,14 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
 
     #read status from file
     else:
-        for g in range(start_gen+1):
-            for i in range(pop_size):
-                save_path_structure = os.path.join(root_dir, "saved_data", experiment_name, "generation_" + str(g), "structure", str(i) + ".npz")
-                np_data = np.load(save_path_structure)
-                structure_data = []
-                for key, value in np_data.items():
-                    structure_data.append(value)
-                structure_data = tuple(structure_data)
-                population_structure_hashes[hashable(structure_data[0])] = True
-                # only a current structure if last gen
-                if g == start_gen:
-                    structures.append(Structure(*structure_data, i))
-        num_evaluations = len(list(population_structure_hashes.keys()))
-        generation = start_gen
+        structures=load_archive(generation,experiment_name,filename='structures')
         archive=load_archive(generation,experiment_name)
+        population_structure_hashes=load_population_hashes(generation,experiment_name)
+        num_evaluations = len(list(population_structure_hashes.keys()))
+        unique_label.set_label_start_for_resuming(num_evaluations)
+        div_log=load_single_array_val(experiment_name,generation,'div')
+        remove_only_files(experiment_name,generation)
+        
 
     while True:
 
@@ -187,7 +184,8 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         #better parallel
         group = mp.Group()
         num_evaluated=sum([0 if structure.is_survivor else 1 for structure in structures])
-        params.calc_params_interactivly(num_evaluated)
+        params.calc_params_interactivly(num_evaluated,scale)
+        queue=multiprocessing.Queue()
         for structure in structures:
 
             if structure.is_survivor:
@@ -205,11 +203,10 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
                     print(f'Error copying controller for {save_path_controller_part}.\n')
                 
             else:        
-                ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name,experiment_name,generation,is_pruning,params)
+                ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name,experiment_name,generation,is_pruning,params,queue)
                 group.add_job(run_ppo, ppo_args, callback=structure.set_reward)
         
-
-        group.run_jobs(num_cores)
+        group.run_jobs(num_cores,queue)
 
         #not parallel
         #for structure in structures:
@@ -270,5 +267,8 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
                 num_evaluations += 1
 
         structures = structures[:num_children+num_survivors]
+
+        save_polulation_hashes(population_structure_hashes,generation,experiment_name)
+        save_archive(structures,generation,experiment_name,filename='structures')
 
         generation += 1

@@ -27,7 +27,7 @@ class Group():
         self.jobs.append(multiprocessing.Process(target=job_wrapper, args=(func, args, self.return_data[-1])))
         self.callback.append(callback)
 
-    def run_jobs(self, num_proc):
+    def run_jobs(self, num_proc,queue):
         
         next_job = 0
         num_jobs_open = 0
@@ -48,12 +48,15 @@ class Group():
 
             for job_index in jobs_closed:
                 jobs_open.remove(job_index)
+            
 
-            while(num_jobs_open < num_proc and next_job != len(self.jobs)):
+            while((num_jobs_open < num_proc or queue.qsize() < num_proc) and next_job != len(self.jobs)):
                 self.jobs[next_job].start()
                 jobs_open.add(next_job)
+                queue.put(0)
                 next_job += 1
                 num_jobs_open += 1
+                print('queue length = {}, num_jobs_open = {}'.format(queue.qsize(),num_jobs_open))
 
             time.sleep(0.1)
 

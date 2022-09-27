@@ -8,22 +8,24 @@ class Singleton():
 
 class Params(Singleton):
 
-    def __init__(self) -> None:
+    def __init__(self,pop_size,scale=1,num_cores=32) -> None:
         self.pruning_num=None
         self.params=None
         self.eval_require_dict=None
         self.eval_border_dict=None
-        self.calc_params_interactivly(32)
+        self.num_cores=num_cores
+        self.calc_params_interactivly(pop_size,scale)
 
-    def calc_params_interactivly(self,eval_pop_size):
+    def calc_params_interactivly(self,eval_pop_size,scale=1):
         eval_timing_arr=[50,100,250,500]
-        n=math.ceil(math.log2(eval_pop_size))
+        n=math.ceil(math.log2(eval_pop_size//scale))
         self.pruning_num=n-1
 
         self.params={}
         self.eval_require_dict={}
         self.eval_border_dict={}
         self.params['timing0_border']=eval_pop_size
+
         pre_index=5-n
         for i in range(self.pruning_num):
             self.params["pruning_timing"+str(i+1)]=eval_timing_arr[pre_index+i]
@@ -40,10 +42,10 @@ class Params(Singleton):
         return False
 
 if __name__=="__main__":
-    params=Params()
-    print('id: {} \n'.format(id(params)))
-    params=Params()
-    print('id: {} \n'.format(id(params)))
+    #params=Params()
+    #print('id: {} \n'.format(id(params)))
+    #params=Params()
+    #print('id: {} \n'.format(id(params)))
     '''
     for i in range(12,33):
         params.calc_params_interactivly(i)

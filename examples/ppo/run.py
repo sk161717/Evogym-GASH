@@ -16,7 +16,7 @@ from ppo.arguments import get_args
 from ppo.evaluate import evaluate
 from ppo.envs import make_vec_envs
 from utils.algo_utils import save_eval_history,is_pruned,is_stop,refer_env_eval_step, save_steps
-from utils.pruning_params import Params
+
 
 from a2c_ppo_acktr import algo
 from a2c_ppo_acktr.algo import gail
@@ -37,7 +37,10 @@ def run_ppo(
     gen=None,
     is_pruning=False,
     params=None,
-    verbose = True):
+    queue=None,
+    index=-1,
+    verbose = True,
+    ):
 
     assert (structure == None) == (termination_condition == None) and (structure == None) == (saving_convention == None)
 
@@ -264,9 +267,12 @@ def run_ppo(
         if is_pruning and params.judge_timing(j):
             print('get into pruning section iters {}, index {} '.format(j,saving_convention[1]))
             save_eval_history(expr_name,gen,eval_history,saving_convention[1],j)
+            if queue.qsize() >0:
+                _=queue.get()
+            #interactive stop
             while is_stop(j,expr_name,gen,params):
                 print('now stopping index : '+str(saving_convention[1]) + ' at iteration '+str(j))
-                time.sleep(10)
+                time.sleep(100)
             if is_pruned(saving_convention[1],j,expr_name,gen,args.eval_interval,params):
                 train_steps=args.num_processes*args.num_steps*j
                 eval_steps=len(eval_history)*refer_env_eval_step(override_env_name)
@@ -274,7 +280,11 @@ def run_ppo(
                 save_steps(expr_name,gen,num_steps,saving_convention[1])
                 print('is pruned index : '+str(saving_convention[1]))
                 return max_determ_avg_reward
-
+            while queue.qsize() >= params.num_cores:
+                time.sleep(100)
+                print('now waiting : '+str(saving_convention[1]) + ' at iteration '+str(j))
+            queue.put(0)
+            print('now resume training : '+str(saving_convention[1]) + ' at iteration '+str(j))
 
 
 #python ppo_main_test.py --env-name "roboticgamedesign-v0" --algo ppo --use-gae --lr 2.5e-4 --clip-param 0.1 --value-loss-coef 0.5 --num-processes 1 --num-steps 128 --num-mini-batch 4 --log-interval 1 --use-linear-lr-decay --entropy-coef 0.01
