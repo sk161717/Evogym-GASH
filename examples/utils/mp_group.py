@@ -1,6 +1,7 @@
 import multiprocessing
 import time
 import traceback
+from utils.algo_utils import is_promote, write_start_log
 
 def job_wrapper(func, args, data_container):
         try:
@@ -19,6 +20,15 @@ class Group():
         self.jobs = []
         self.return_data = []
         self.callback = []
+        self.expr_name=None
+        self.gen=None
+        self.params=None
+        
+    
+    def add_args(self,expr_name,gen,params):
+        self.expr_name=expr_name
+        self.gen=gen
+        self.params=params
 
 
     def add_job(self, func, args, callback):
@@ -50,10 +60,11 @@ class Group():
                 jobs_open.remove(job_index)
             
 
-            while((num_jobs_open < num_proc or queue.qsize() < num_proc) and next_job != len(self.jobs)):
+            while((num_jobs_open < num_proc or (queue.qsize() < num_proc and is_promote(self.expr_name,self.gen,self.params,0))) and next_job != len(self.jobs)):
+                write_start_log(self.expr_name,self.gen,0,self.params)
                 self.jobs[next_job].start()
                 jobs_open.add(next_job)
-                queue.put(0)
+                queue.put(0) 
                 next_job += 1
                 num_jobs_open += 1
                 print('queue length = {}, num_jobs_open = {}'.format(queue.qsize(),num_jobs_open))

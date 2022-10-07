@@ -26,9 +26,12 @@ from utils.pruning_params import Params
 
 def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         env_name,
-        max_evaluations, 
+        max_evaluations,
+        eval_timing_arr, 
         is_pruning=False,
         scale=1,
+        is_ist=False,
+        resume_gen=None,
         dim_map=2,
         n_niches=128, 
         target_score=None,
@@ -51,18 +54,23 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
         os.makedirs(home_path)
     except:
         print(f'THIS EXPERIMENT ({experiment_name}) ALREADY EXISTS')
-        print("Override? (y/n/c): ", end="")
-        ans = input()
-        if ans.lower() == "y":
-            shutil.rmtree(home_path)
-            print()
-        elif ans.lower() == "c":
-            print("Enter gen to start training on (0-indexed): ", end="")
-            start_gen = int(input())
-            is_continuing = True
-            print()
+        if is_ist:
+            print('this experiment is launched in ist, continue from gen:'+str(resume_gen))
+            start_gen=resume_gen
+            is_continuing=True
         else:
-            return
+            print("Override? (y/n/c): ", end="")
+            ans = input()
+            if ans.lower() == "y":
+                shutil.rmtree(home_path)
+                print()
+            elif ans.lower() == "c":
+                print("Enter gen to start training on (0-indexed): ", end="")
+                start_gen = int(input())
+                is_continuing = True
+                print()
+            else:
+                return
 
     ### STORE META-DATA ##
     if not is_continuing:
@@ -108,7 +116,7 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
     generation = start_gen
     archive = {}  # init archive (empty)
     curr_max=0
-    params=Params(pop_size,scale,num_cores)
+    params=Params(pop_size,eval_timing_arr,scale,num_cores)
     div_log=[]
 
     c = cm.cvt(n_niches, dim_map,
@@ -205,7 +213,8 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
             else:        
                 ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name,experiment_name,generation,is_pruning,params,queue)
                 group.add_job(run_ppo, ppo_args, callback=structure.set_reward)
-        
+        initialize_start_log(experiment_name,generation,params)
+        group.add_args(experiment_name,generation,params)
         group.run_jobs(num_cores,queue)
 
         #not parallel

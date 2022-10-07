@@ -1,15 +1,20 @@
+from genericpath import isfile
 import json
 import math
 import sys,os,random
+from weakref import ref
 
 from sympy import root
 from evogym import is_connected, has_actuator, get_full_connectivity, draw, get_uniform
+from filelock import FileLock,Timeout
 import pickle
 import matplotlib.pyplot as plt
 import numpy as np
 import statistics
 import pandas as pd
 import glob
+
+from utils.pruning_params import Params
 
 curr_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.join(curr_dir, '..')
@@ -431,8 +436,11 @@ def save_eval_history(expr_name,gen,eval_history,label,curr_evals=None):
     out = ""
     str_eval_hist=list(map(str,eval_history))
     out+= str(label) +'\t\t'+ '\t\t'.join(str_eval_hist) + '\n'
-    with open(path,'a') as f:
-        f.write(out)
+    lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt.lock')
+    lock=FileLock(lockpath,timeout=1)
+    with lock:
+        with open(path,'a') as f:
+            f.write(out)
 
 def save_steps(expr_name,gen,step,label):
     path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'steps.txt')
@@ -462,34 +470,31 @@ def save_evaluated_score(expr_name,gen,structures):
     f.write(out)
     f.close()
 
-def is_pruned(label,curr_evals,expr_name,gen,eval_interval,params):
+def df_eval_history(expr_name,gen,curr_evals):
     data_arr=[]
     path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt')
-    
-    with open(path) as f:
-        for line in f:
-            items=list(map(float,line.split('\t\t')))
-            if len(items)!=(curr_evals//eval_interval+1):
-                items=items[0:1]+items[2:]
-            data_arr.append(items)
+    lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt.lock')
+    lock=FileLock(lockpath,timeout=1)
+    with lock:
+        with open(path) as f:
+            for line in f:
+                items=list(map(float,line.split('\t\t')))
+                data_arr.append(items)
             
     df=pd.DataFrame(data_arr)
-    start_index=curr_evals//eval_interval-4
-    end_index=curr_evals//eval_interval+1
-    
+    end_index=len(data_arr[0])
     
     df.iloc[:,0]=df.iloc[:,0].apply(int)
-    #df.loc[:,'var']=df.iloc[:,start_index:end_index].var(axis=1)
     df.loc[:,'max']=df.iloc[:,1:end_index].max(axis=1)
-    #df.loc[:,'mean']=df.iloc[:,1:end_index].mean(axis=1)
-    #df.loc[:,'var_rank']=df['var'].rank(ascending=False)
-    df.loc[:,'max_rank']=df['max'].rank(ascending=False)
-    #df.loc[:,'mean_rank']=df['mean'].rank(ascending=False)
-    #df.loc[:,'var_max']=df.loc[:,'var_rank']*df.loc[:,'max_rank']
-    df.loc[:,'var_max']=df.loc[:,'max_rank']
-    df.loc[:,'vm_rank']=df['var_max'].rank(method='first',ascending=True)
+    df.loc[:,'max_rank']=df['max'].rank(method='first',ascending=False)
+
+    return df
+
+
+def is_pruned(label,curr_evals,expr_name,gen,eval_interval,params):
+    df=df_eval_history(expr_name,gen,curr_evals)
     
-    rank=df[df.iloc[:,0]==label].loc[:,'vm_rank'].iloc[0]
+    rank=df[df.iloc[:,0]==label].loc[:,'max_rank'].iloc[0]
     if rank > params.eval_border_dict[curr_evals]:
         return True
     else:
@@ -497,10 +502,7 @@ def is_pruned(label,curr_evals,expr_name,gen,eval_interval,params):
 
 
 def is_stop(curr_evals,expr_name,gen,params):
-    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt')
-    
-    with open(path) as f:
-        file_length=len(f.readlines())
+    file_length=load_finished_num(expr_name,gen,curr_evals)
 
     required=params.eval_require_dict[curr_evals] 
 
@@ -511,6 +513,103 @@ def is_stop(curr_evals,expr_name,gen,params):
     elif file_length>required:
         print('Error : file length exceeds required {}'.format(required))
         exit(1)
+    
+def load_tmp_rank(expr_name,gen,ref_eval,label):
+    df=df_eval_history(expr_name,gen,ref_eval)
+    rank=df[df.iloc[:,0]==label].loc[:,'max_rank'].iloc[0]
+    return rank
+
+def load_finished_num(expr_name,gen,ref_eval):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(ref_eval)+'.txt')
+    if os.path.exists(path)==False:
+        return 0
+    lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(ref_eval)+'.txt.lock')
+    lock=FileLock(lockpath,timeout=1)
+    finished_num=0
+    with lock:
+        with open(path) as f:
+            finished_num=len(f.readlines())
+    return finished_num
+
+def load_start(expr_name,gen,timing_index):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'start_log.txt')
+    lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'start_log.txt.lock')
+    lock=FileLock(lockpath,timeout=1)
+    with lock:
+        with open(path) as f:
+            content= f.readlines()[-1]
+            array=json.loads(content)  #ex)27,11,3,0,0
+    return array[timing_index]
+
+def calc_pruning_timing_index(ref_eval,params:Params):
+    #0,64,128,256,512->0,1,2,3,4
+    #0,128,256.512->0,1,2,3
+    if ref_eval==0:
+        return 0
+    else:
+        pre_index=4-params.pruning_num
+        return params.eval_timing_arr.index(ref_eval)+1-pre_index
+        
+
+
+def is_startable(expr_name,gen,label,curr_evals,params:Params):
+    rank=load_tmp_rank(curr_evals,label)
+    finished_num=load_finished_num(curr_evals)
+    timing_index=calc_pruning_timing_index(curr_evals)
+    if rank+params.params["timing"+str(timing_index)+"_border"]<=finished_num:
+        return True
+    else:
+        return False
+    
+        
+def is_promote(expr_name,gen,params:Params,curr_evals,label=None):
+    reversed_eval_timing_arr=list(reversed(params.eval_timing_arr))
+    for i in range(params.pruning_num):
+        ref_eval=reversed_eval_timing_arr[i]
+        if curr_evals==ref_eval:
+            assert label!=None
+            return is_startable(expr_name,gen,label,curr_evals,params)
+        else:
+            finished_num=load_finished_num(expr_name,gen,ref_eval)
+            timing_index=calc_pruning_timing_index(ref_eval,params)
+            start=load_start(expr_name,gen,timing_index)
+            print(start,timing_index,params.params["timing"+str(timing_index)+"_border"],finished_num)
+
+            if start+params.params["timing"+str(timing_index)+"_border"]>=finished_num:
+                continue
+            else:
+                # upper rung is not promoted yet
+                print('called yet to ve promoted')
+                return False
+    # if all candidates in rung i>0 cannot promote
+    return True
+
+def initialize_start_log(expr_name,gen,params:Params):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'start_log.txt')
+    lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'start_log.txt.lock')
+    lock=FileLock(lockpath,timeout=1)
+    array=[0 for i in range(params.pruning_num+1)]
+    content=json.dumps(array)
+    with lock:
+        with open(path,'w') as f:
+            f.write(content)
+
+def write_start_log(expr_name,gen,curr_evals,params):
+    path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'start_log.txt')
+    lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'start_log.txt.lock')
+    lock=FileLock(lockpath,timeout=1)
+    timing_index=calc_pruning_timing_index(curr_evals,params)
+    with lock:
+        with open(path,'r+') as f:
+            last_line = f.readlines()[-1]
+            print('last_line',last_line)
+            array=json.loads(last_line)
+            array[timing_index]+=1
+            content=json.dumps(array)
+            f.write('\n')
+            f.write(content)
+
+
 
 def refer_env_eval_step(env_name):
     environment_steps=\
@@ -518,6 +617,7 @@ def refer_env_eval_step(env_name):
         "Walker-v0":500,
         "UpStepper-v0":600,
         "PlatformJumper-v0":1000,
+        'ObstacleTraverser-v1':1000,
     }
     return environment_steps[env_name]
 
@@ -536,7 +636,7 @@ def calc_step_from_evaluated(evaluated):
 def calc_max_evaluations_in_GA(total_step):
     return total_step/16
 
-def calc_step_from_evaluations(max_evaluations):
+def calc_GAEval_from_SHEvaluations(max_evaluations):
     total_step=0
     gen=0
     pop_size=32
@@ -557,9 +657,10 @@ def calc_step_from_evaluations(max_evaluations):
         num_survivors = max(2, math.ceil(pop_size * percent_survival))
         gen+=1
     
-    print(gen,num_evaluations,total_step,calc_max_evaluations_in_GA(total_step))
+    evaluated_in_GA=calc_max_evaluations_in_GA(total_step)
+    print(gen,num_evaluations,total_step,evaluated_in_GA)
     
-    return calc_max_evaluations_in_GA(total_step)
+    return evaluated_in_GA
 
 
         
