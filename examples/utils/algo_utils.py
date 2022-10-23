@@ -417,7 +417,6 @@ def compute_novelty(X,novelty_archive):
         # save archive
         if f2[i][0]>novelty_threshold:
             novelty_archive.append(X[i][0])
-    print('archive size:',len(novelty_archive))
     return f2
 
 def compute_novelty_for_list(structures,novelty_archive,pop_size):
@@ -431,12 +430,14 @@ def compute_novelty_for_list(structures,novelty_archive,pop_size):
 def save_eval_history(expr_name,gen,eval_history,label,curr_evals=None):
     if curr_evals==None:
         path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history.txt')
+        lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history.txt.lock')
     else:
         path=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt')
+        lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt.lock')
     out = ""
     str_eval_hist=list(map(str,eval_history))
     out+= str(label) +'\t\t'+ '\t\t'.join(str_eval_hist) + '\n'
-    lockpath=os.path.join(root_dir,'saved_data',expr_name,'generation_'+str(gen),'eval_history_'+str(curr_evals)+'.txt.lock')
+    
     lock=FileLock(lockpath,timeout=1)
     with lock:
         with open(path,'a') as f:
@@ -553,16 +554,23 @@ def calc_pruning_timing_index(ref_eval,params:Params):
 
 
 def is_startable(expr_name,gen,label,curr_evals,params:Params):
-    rank=load_tmp_rank(curr_evals,label)
-    finished_num=load_finished_num(curr_evals)
-    timing_index=calc_pruning_timing_index(curr_evals)
+    rank=load_tmp_rank(expr_name,gen,curr_evals,label)
+    finished_num=load_finished_num(expr_name,gen,curr_evals)
+    timing_index=calc_pruning_timing_index(curr_evals,params)
+    print(rank,timing_index,params.params["timing"+str(timing_index)+"_border"],finished_num)
     if rank+params.params["timing"+str(timing_index)+"_border"]<=finished_num:
+        write_start_log(expr_name,gen,curr_evals,params)
         return True
     else:
         return False
     
         
 def is_promote(expr_name,gen,params:Params,curr_evals,label=None):
+    if label==None:
+        print('eval=0 promotion judge')
+    else:
+        print('label={},eval={},promotion judge'.format(label,curr_evals))
+    
     reversed_eval_timing_arr=list(reversed(params.eval_timing_arr))
     for i in range(params.pruning_num):
         ref_eval=reversed_eval_timing_arr[i]
@@ -573,7 +581,7 @@ def is_promote(expr_name,gen,params:Params,curr_evals,label=None):
             finished_num=load_finished_num(expr_name,gen,ref_eval)
             timing_index=calc_pruning_timing_index(ref_eval,params)
             start=load_start(expr_name,gen,timing_index)
-            print(start,timing_index,params.params["timing"+str(timing_index)+"_border"],finished_num)
+            #print(start,timing_index,params.params["timing"+str(timing_index)+"_border"],finished_num)
 
             if start+params.params["timing"+str(timing_index)+"_border"]>=finished_num:
                 continue
@@ -602,7 +610,6 @@ def write_start_log(expr_name,gen,curr_evals,params):
     with lock:
         with open(path,'r+') as f:
             last_line = f.readlines()[-1]
-            print('last_line',last_line)
             array=json.loads(last_line)
             array[timing_index]+=1
             content=json.dumps(array)
@@ -617,6 +624,7 @@ def refer_env_eval_step(env_name):
         "Walker-v0":500,
         "UpStepper-v0":600,
         "PlatformJumper-v0":1000,
+        'ObstacleTraverser-v0':1000,
         'ObstacleTraverser-v1':1000,
     }
     return environment_steps[env_name]

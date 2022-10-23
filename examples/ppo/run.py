@@ -232,7 +232,7 @@ def run_ppo(
                     print(f'Evaluated {saving_convention[1]} using {args.num_evals} episodes. Mean reward: {np.mean(determ_avg_reward)}\n')
                 else:
                     print(f'Evaluated using {args.num_evals} episodes. Mean reward: {np.mean(determ_avg_reward)}\n')
-            
+           
             if expr_name!=None and j!=0:   
                 eval_history.append(determ_avg_reward)
                
@@ -270,10 +270,10 @@ def run_ppo(
             if queue.qsize() >0:
                 _=queue.get()
             #interactive stop
-            #while is_stop(j,expr_name,gen,params):
-            while is_promote(expr_name,gen,params,j,saving_convention[1])==False and is_stop(j,expr_name,gen,params):
-                print('now stopping index : '+str(saving_convention[1]) + ' at iteration '+str(j))
-                time.sleep(5)
+            while is_stop(j,expr_name,gen,params):
+            #while is_promote(expr_name,gen,params,j,saving_convention[1])==False and is_stop(j,expr_name,gen,params):
+                #print('now stopping index : '+str(saving_convention[1]) + ' at iteration '+str(j))
+                time.sleep(1)
             if is_pruned(saving_convention[1],j,expr_name,gen,args.eval_interval,params):
                 train_steps=args.num_processes*args.num_steps*j
                 eval_steps=len(eval_history)*refer_env_eval_step(override_env_name)
@@ -281,10 +281,10 @@ def run_ppo(
                 save_steps(expr_name,gen,num_steps,saving_convention[1])
                 print('is pruned index : '+str(saving_convention[1]))
                 return max_determ_avg_reward
-            write_start_log(expr_name,gen,j,params)
+
             while queue.qsize() >= params.num_cores:
-                time.sleep(5)
-                print('now waiting : '+str(saving_convention[1]) + ' at iteration '+str(j))
+                time.sleep(0.1)
+                #print('now waiting : '+str(saving_convention[1]) + ' at iteration '+str(j))
             queue.put(0)
             print('now resume training : '+str(saving_convention[1]) + ' at iteration '+str(j))
 

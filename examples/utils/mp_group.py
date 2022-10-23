@@ -60,14 +60,16 @@ class Group():
                 jobs_open.remove(job_index)
             
 
-            while((num_jobs_open < num_proc or (queue.qsize() < num_proc and is_promote(self.expr_name,self.gen,self.params,0))) and next_job != len(self.jobs)):
-                write_start_log(self.expr_name,self.gen,0,self.params)
+            #while((num_jobs_open < num_proc or (queue.qsize() < num_proc and is_promote(self.expr_name,self.gen,self.params,0))) and next_job != len(self.jobs)):
+            while((num_jobs_open < num_proc or (queue.qsize() < num_proc)) and next_job != len(self.jobs)):
+                #write_start_log(self.expr_name,self.gen,0,self.params)
                 self.jobs[next_job].start()
                 jobs_open.add(next_job)
                 queue.put(0) 
                 next_job += 1
                 num_jobs_open += 1
                 print('queue length = {}, num_jobs_open = {}'.format(queue.qsize(),num_jobs_open))
+                #time.sleep(1)
 
             time.sleep(0.1)
 

@@ -213,7 +213,7 @@ def run_ga(experiment_name, structure_shape, pop_size,train_iters, num_cores,
             else:        
                 ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name,experiment_name,generation,is_pruning,params,queue)
                 group.add_job(run_ppo, ppo_args, callback=structure.set_reward)
-        initialize_start_log(experiment_name,generation,params)
+        #initialize_start_log(experiment_name,generation,params)
         group.add_args(experiment_name,generation,params)
         group.run_jobs(num_cores,queue)
 

@@ -14,13 +14,25 @@ if __name__ == "__main__":
     seed = args.randseed
     random.seed(seed)
     np.random.seed(seed)
-    env_name="PlatformJumper-v0"
+
+    env_max_eval=\
+    {
+        "UpStepper-v0":3000,
+        "PlatformJumper-v0":6000,
+        'ObstacleTraverser-v0':3000,
+        'ObstacleTraverser-v1':6000,
+    }
+
+    #env_name='Walker-v0'
+    env_name="UpStepper-v0"
+    #env_name="PlatformJumper-v0"
     #env_name="ObstacleTraverser-v1"
+    #env_name='ObstacleTraverser-v0'
 
     is_pruning=True
     is_ist=False
     resume_gen=204
-    robot_size=5
+    robot_size=8
     scale=1
 
     is_tournament=False
@@ -33,14 +45,16 @@ if __name__ == "__main__":
 
     train_iters=1024
     eval_timing_arr=[64,128,256,512]
-    #train_iters=64
-    #eval_timing_arr=[4,8,16,32]
-    max_evaluations=6000
+    #train_iters=128
+    #eval_timing_arr=[8,16,32,64]
+    max_evaluations=env_max_eval[env_name]
 
     assert  train_iters%args.eval_interval==0
     for eval_timing in eval_timing_arr:
         assert eval_timing%args.eval_interval==0
     assert is_ist==False or resume_gen!=None
+
+    
 
 
 
@@ -61,7 +75,7 @@ if __name__ == "__main__":
             structure_shape = (robot_size,robot_size),
             pop_size = 32*scale,
             train_iters = train_iters,
-            num_cores = 32 if is_pruning or is_ist else 8,
+            num_cores = 32 if is_pruning or is_ist else 32,
             env_name=env_name,
             max_evaluations = max_evaluations if is_pruning else math.ceil(calc_GAEval_from_SHEvaluations(max_evaluations)),
             eval_timing_arr=eval_timing_arr,
