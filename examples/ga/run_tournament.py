@@ -4,6 +4,7 @@ import numpy as np
 import shutil
 import random
 import math
+import multiprocessing
 
 import sys
 curr_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,18 +20,18 @@ from ppo import run_ppo
 from evogym import sample_robot, hashable
 import utils.mp_group as mp
 from utils.algo_utils import *
+from utils.pruning_params import Params
 
-unique_label = UniqueLabel()
 
-def run_ga_tournament(
-    experiment_name, 
-    structure_shape, 
-    pop_size,
-    train_iters,
-    num_cores,
+
+def run_ga_tournament(experiment_name, structure_shape, pop_size,train_iters,num_cores,
     env_name,
     max_evaluations, 
+    eval_timing_arr, 
     is_pruning=False,
+    scale=1,
+    is_ist=False,
+    resume_gen=None,
     dim_map=2,
     n_niches=128,
     params=cm.default_params,
@@ -39,6 +40,7 @@ def run_ga_tournament(
     ### STARTUP: MANAGE DIRECTORIES ###
     home_path = os.path.join(root_dir, "saved_data", experiment_name)
     start_gen = 0
+    unique_label = UniqueLabel()
 
     ### DEFINE TERMINATION CONDITION ###    
     tc = TerminationCondition(train_iters)
@@ -48,18 +50,23 @@ def run_ga_tournament(
         os.makedirs(home_path)
     except:
         print(f'THIS EXPERIMENT ({experiment_name}) ALREADY EXISTS')
-        print("Override? (y/n/c): ", end="")
-        ans = input()
-        if ans.lower() == "y":
-            shutil.rmtree(home_path)
-            print()
-        elif ans.lower() == "c":
-            print("Enter gen to start training on (0-indexed): ", end="")
-            start_gen = int(input())
-            is_continuing = True
-            print()
+        if is_ist:
+            print('this experiment is launched in ist, continue from gen:'+str(resume_gen))
+            start_gen=resume_gen
+            is_continuing=True
         else:
-            return
+            print("Override? (y/n/c): ", end="")
+            ans = input()
+            if ans.lower() == "y":
+                shutil.rmtree(home_path)
+                print()
+            elif ans.lower() == "c":
+                print("Enter gen to start training on (0-indexed): ", end="")
+                start_gen = int(input())
+                is_continuing = True
+                print()
+            else:
+                return
 
     ### STORE META-DATA ##
     if not is_continuing:
@@ -103,13 +110,8 @@ def run_ga_tournament(
     population_structure_hashes = {}
     num_evaluations = 0
     generation = start_gen
-    archive = {}  # init archive (empty)
-    novelty_archive=[]
+    params=Params(pop_size,eval_timing_arr,scale,num_cores)
     div_log=[]
-
-    c = cm.cvt(n_niches, dim_map,
-               params['cvt_samples'], params['cvt_use_cache'])
-    kdt = KDTree(c, leaf_size=30, metric='euclidean')
 
     # random initialization
     if not is_continuing:
@@ -124,10 +126,10 @@ def run_ga_tournament(
 
     else:  
         structures=load_archive(generation,experiment_name,filename='structures')
-        archive=load_archive(generation,experiment_name)
         population_structure_hashes=load_population_hashes(generation,experiment_name)
         num_evaluations=calc_curr_evaluation(generation,pop_size,pop_size)
         unique_label.set_label_start_for_resuming(num_evaluations+pop_size)
+        div_log=load_single_array_val(experiment_name,generation,'div')
         assert len(structures) == 2*pop_size
         
     
@@ -157,22 +159,19 @@ def run_ga_tournament(
 
         #better parallel
         group = mp.Group()
+        params.calc_params_interactivly(pop_size,scale)
+        queue=multiprocessing.Queue()
         for structure in structures[len(structures)-pop_size:]:
-            ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name,experiment_name,generation,is_pruning)
+            ppo_args = ((structure.body, structure.connections), tc, (save_path_controller, structure.label),env_name,experiment_name,generation,is_pruning,params,queue)
             group.add_job(run_ppo, ppo_args, callback=structure.set_reward)
             num_evaluations+=1
-        group.run_jobs(num_cores)
+        group.run_jobs(num_cores,queue)
 
         ### COMPUTE FITNESS, SORT, AND SAVE ###
         for structure in structures[len(structures)-pop_size:]:
             structure.compute_fitness()
-            structure.desc=cm.calc_desc(structure.body)
-            __add_to_archive(structure,structure.desc,archive,kdt)
-        
-        compute_novelty_for_list(structures[len(structures)-pop_size:],novelty_archive,pop_size)
-        save_evaluated_score(experiment_name,generation,structures[len(structures)-pop_size:])
 
-        save_archive(archive,generation,experiment_name)
+        save_evaluated_score(experiment_name,generation,structures[len(structures)-pop_size:])
 
         structures = sorted(structures, key=lambda structure: structure.fitness, reverse=True)
         structures = structures[:pop_size]
@@ -184,8 +183,6 @@ def run_ga_tournament(
         plot_one_graph(experiment_name,generation,fitness_list,evaluation_list)
         plot_one_graph(experiment_name,generation,div_log,evaluation_list,target='div')
         save_single_array_val(div_log,experiment_name,generation,'div')
-
-        cm.save_centroid_and_map(root_dir,experiment_name,generation,archive,n_niches)
 
         #SAVE LINEAGE TO FILE
         add_lineage(structures,experiment_name,generation)
@@ -199,7 +196,7 @@ def run_ga_tournament(
         
         # for randomly selected survivors, produce children (w mutations)
         num_children = 0
-        while num_children < pop_size:
+        while num_children < pop_size and num_evaluations+num_children<max_evaluations:
 
             parent_index = tournament_selection(structures,pop_size)
             child = mutate(structures[parent_index].body.copy(), mutation_rate = 0.1, num_attempts=50)
@@ -213,7 +210,7 @@ def run_ga_tournament(
         
         
         save_polulation_hashes(population_structure_hashes,generation,experiment_name)
-        # write structure pkl file(structure length = 2* popsize)
         save_archive(structures,generation,experiment_name,filename='structures')
+        # write structure pkl file(structure length = 2* popsize)
        
         generation += 1

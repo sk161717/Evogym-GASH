@@ -52,6 +52,7 @@ def eval_genome_fitness(genome, config, genome_id, generation):
         structure=(robot, connectivity),
         termination_condition=TerminationCondition(config.extra_info['train_iters']),
         saving_convention=(save_path_controller, genome_id),
+        override_env_name=config.extra_info['env_name'],
     )
     return fitness
 
@@ -99,6 +100,7 @@ def run_cppn_neat(
         max_evaluations,
         train_iters,
         num_cores,
+        env_name,
     ):
 
     save_path = os.path.join(root_dir, 'saved_data', experiment_name)
@@ -137,10 +139,8 @@ def run_cppn_neat(
             'train_iters': train_iters,
             'save_path': save_path,
             'structure_hashes': structure_hashes,
+            'env_name':env_name,
         },
-        custom_config=[
-            ('NEAT', 'pop_size', pop_size),
-        ],
     )
 
     pop = Population(config)

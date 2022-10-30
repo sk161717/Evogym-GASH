@@ -17,36 +17,39 @@ if __name__ == "__main__":
 
     env_max_eval=\
     {
+        'Walker-v0':1000,
         "UpStepper-v0":3000,
         "PlatformJumper-v0":6000,
         'ObstacleTraverser-v0':3000,
         'ObstacleTraverser-v1':6000,
+        'Hurdler-v0':6000,
     }
 
-    #env_name='Walker-v0'
-    env_name="UpStepper-v0"
+    env_name='Walker-v0'
+    #env_name="UpStepper-v0"
     #env_name="PlatformJumper-v0"
     #env_name="ObstacleTraverser-v1"
     #env_name='ObstacleTraverser-v0'
+    #env_name='Hurdler-v0'
 
     is_pruning=True
     is_ist=False
     resume_gen=204
-    robot_size=8
-    scale=1
+    robot_size=5
+    scale=8
 
-    is_tournament=False
+    is_tournament=True
     is_transfer=False
     transfer_gen=100
     suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
-    suffix="scale" if scale > 1 else ""
+    suffix="scale"+str(scale) if scale > 1 else ""
     suffix+="SuHa" if is_pruning else ""
     suffix+=str(robot_size)+'*'+str(robot_size) if robot_size!=5 else ''
 
-    train_iters=1024
-    eval_timing_arr=[64,128,256,512]
-    #train_iters=128
-    #eval_timing_arr=[8,16,32,64]
+    #train_iters=1024
+    #eval_timing_arr=[64,128,256,512]
+    train_iters=128
+    eval_timing_arr=[8,16,32,64]
     max_evaluations=env_max_eval[env_name]
 
     assert  train_iters%args.eval_interval==0
@@ -62,12 +65,16 @@ if __name__ == "__main__":
         run_ga_tournament(
             experiment_name = env_name+"_Tournament"+suffix+"GA_seed:"+str(seed),
             structure_shape = (5,5),
-            pop_size = 4,
-            train_iters = 200,
-            num_cores = 4,
+            pop_size = 32,
+            train_iters = train_iters,
+            num_cores = 32,
             env_name=env_name,
             max_evaluations = 1000,
+            eval_timing_arr=eval_timing_arr,
             is_pruning=is_pruning,
+            scale=scale,
+            is_ist=is_ist,
+            resume_gen=resume_gen,
         )
     else:
         run_ga(

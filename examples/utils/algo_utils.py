@@ -626,6 +626,7 @@ def refer_env_eval_step(env_name):
         "PlatformJumper-v0":1000,
         'ObstacleTraverser-v0':1000,
         'ObstacleTraverser-v1':1000,
+        'Hurdler-v0':1000,
     }
     return environment_steps[env_name]
 

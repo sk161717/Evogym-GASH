@@ -38,7 +38,6 @@ def run_ppo(
     is_pruning=False,
     params=None,
     queue=None,
-    index=-1,
     verbose = True,
     ):
 
