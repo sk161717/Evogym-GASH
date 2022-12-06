@@ -4,6 +4,7 @@ import random
 import numpy as np
 import torch
 import neat
+import multiprocessing
 
 import sys
 curr_dir = os.path.dirname(os.path.abspath(__file__))
@@ -21,6 +22,8 @@ from utils.algo_utils import TerminationCondition
 from ppo import run_ppo
 from evogym import is_connected, has_actuator, get_full_connectivity, hashable
 import evogym.envs
+from utils.pruning_params import Params
+from utils.algo_utils import max_fit_list_single,plot_one_graph
 
 
 def get_cppn_input(structure_shape):
@@ -53,6 +56,10 @@ def eval_genome_fitness(genome, config, genome_id, generation):
         termination_condition=TerminationCondition(config.extra_info['train_iters']),
         saving_convention=(save_path_controller, genome_id),
         override_env_name=config.extra_info['env_name'],
+        expr_name=config.extra_info['experiment_name'],
+        gen=generation,
+        is_pruning=config.extra_info['is_pruning'],
+        params=config.extra_info['params'],
     )
     return fitness
 
@@ -91,16 +98,22 @@ class SaveResultReporter(neat.BaseReporter):
             out = ''
             for genome_id, genome in zip(genome_id_list, genome_list):
                 out += f'{genome_id}\t\t{genome.fitness}\n'
+            num_evaluations=(self.generation+1)*config.pop_size
+            out+="current evaluation: "+str(num_evaluations)+"\n"
             f.write(out)
+        fitness_list,evaluation_list=max_fit_list_single(config.extra_info['experiment_name'],self.generation)
+        plot_one_graph(config.extra_info['experiment_name'],self.generation,fitness_list,evaluation_list)
 
 def run_cppn_neat(
         experiment_name,
         structure_shape,
         pop_size,
-        max_evaluations,
         train_iters,
         num_cores,
+        max_evaluations,
         env_name,
+        eval_timing_arr,
+        is_pruning,
     ):
 
     save_path = os.path.join(root_dir, 'saved_data', experiment_name)
@@ -126,6 +139,8 @@ def run_cppn_neat(
             f'TRAIN_ITERS: {train_iters}\n')
 
     structure_hashes = {}
+    params=Params(pop_size,eval_timing_arr,1,num_cores)
+    params.calc_params_interactivly(pop_size,1)
 
     config_path = os.path.join(curr_dir, 'neat.cfg')
     config = neat.Config(
@@ -140,6 +155,9 @@ def run_cppn_neat(
             'save_path': save_path,
             'structure_hashes': structure_hashes,
             'env_name':env_name,
+            'experiment_name':experiment_name,
+            'is_pruning':is_pruning,
+            'params':params,
         },
     )
 

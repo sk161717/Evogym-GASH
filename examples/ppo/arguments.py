@@ -157,6 +157,11 @@ def get_args():
         help='use a linear schedule on the learning rate')
     parser.add_argument(
         '--randseed', type=int, default=1, help='random seed (default: 1)')
+    parser.add_argument(
+        '--is-pruning', 
+        type=int,
+        default=None,
+    )
     args = parser.parse_args()
 
     args.cuda = not args.no_cuda and torch.cuda.is_available()

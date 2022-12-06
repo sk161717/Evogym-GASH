@@ -37,7 +37,9 @@ class Population(neat.Population):
             if constraint_function is not None:
                 genomes = list(self.population.items())
                 validity = constraint_function(genomes, self.config, self.generation)
+                print('validity:{}'.format(validity))
                 valid_idx = np.where(validity)[0]
+                print('valid_idx:{}'.format(valid_idx))
                 valid_genomes = np.array(genomes)[valid_idx]
                 while len(valid_genomes) < self.config.pop_size:
                     new_population = self.reproduction.create_new(self.config.genome_type,
@@ -45,13 +47,16 @@ class Population(neat.Population):
                                                                     self.config.pop_size - len(valid_genomes))
                     new_genomes = list(new_population.items())
                     validity = constraint_function(new_genomes, self.config, self.generation)
+                    print('validity:{}'.format(validity))
                     valid_idx = np.where(validity)[0]
+                    print('valid_idx:{}'.format(valid_idx))
                     valid_genomes = np.vstack([valid_genomes, np.array(new_genomes)[valid_idx]])
 
                 self.population = dict(valid_genomes)
                 self.species.speciate(self.config, self.population, self.generation)
 
             # Evaluate all genomes using the user-provided function.
+            print('population:{}, pop_size:{}\n'.format(self.population.items(),len(self.population.items())))
             fitness_function(list(self.population.items()), self.config, self.generation)
 
             # Gather and report statistics.

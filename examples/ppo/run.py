@@ -266,8 +266,8 @@ def run_ppo(
         if is_pruning and params.judge_timing(j):
             print('get into pruning section iters {}, index {} '.format(j,saving_convention[1]))
             save_eval_history(expr_name,gen,eval_history,saving_convention[1],j)
-            if queue.qsize() >0:
-                _=queue.get()
+            #if queue.qsize() >0:
+                #_=queue.get()
             #interactive stop
             while is_stop(j,expr_name,gen,params):
             #while is_promote(expr_name,gen,params,j,saving_convention[1])==False and is_stop(j,expr_name,gen,params):
@@ -281,10 +281,10 @@ def run_ppo(
                 print('is pruned index : '+str(saving_convention[1]))
                 return max_determ_avg_reward
 
-            while queue.qsize() >= params.num_cores:
-                time.sleep(0.1)
+            #while queue.qsize() >= params.num_cores:
+                #time.sleep(0.1)
                 #print('now waiting : '+str(saving_convention[1]) + ' at iteration '+str(j))
-            queue.put(0)
+            #queue.put(0)
             print('now resume training : '+str(saving_convention[1]) + ' at iteration '+str(j))
 
 

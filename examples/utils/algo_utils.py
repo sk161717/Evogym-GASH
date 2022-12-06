@@ -627,6 +627,11 @@ def refer_env_eval_step(env_name):
         'ObstacleTraverser-v0':1000,
         'ObstacleTraverser-v1':1000,
         'Hurdler-v0':1000,
+        'GapJumper-v0':1000,
+        'Climber-v0':400,
+        'Traverser-v0':1000,
+        'WingspanMazimizer-v0':600,
+        
     }
     return environment_steps[env_name]
 
