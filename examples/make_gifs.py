@@ -137,9 +137,9 @@ class Job():
 if __name__ == '__main__':
     exp_root = os.path.join('saved_data')
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
-    env_name="Climber-v0"
-    seed=101
-    experiment_name = env_name+"_SuHacppn_seed:"+str(seed)
+    env_name="WingspanMazimizer-v0"
+    seed=107
+    experiment_name = env_name+"_SuHaGA_seed:"+str(seed)
     use_cells=False
     is_transfer=False
     transfer_gen=100
@@ -163,9 +163,9 @@ if __name__ == '__main__':
         experiment_names=[experiment_name],
         env_names = [env_name],
         load_dir = exp_root,
-        generations=[33],
+        generations=[96],
         population_size=32,
-        ranks = [i for i in range(2)], #not use when use_cells=True
+        ranks = [i for i in range(1)], #not use when use_cells=True
         use_cells=use_cells,
         organize_by_experiment=False,
         organize_by_generation=True,

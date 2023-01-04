@@ -10,7 +10,6 @@ old/
 *.vcxproj.*
 *.sln
 *.egg-info
-*.pdf
 *.npz
 *.ipynb
 dist/

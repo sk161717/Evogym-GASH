@@ -16,16 +16,23 @@ if __name__ == "__main__":
     random.seed(seed)
     np.random.seed(seed)
 
+    train_scale=1
+
     env_max_eval=\
     {
-        'Walker-v0':1000,
-        "UpStepper-v0":3000,
+        'Walker-v0':500,
+        "UpStepper-v0":3000//train_scale,
         "PlatformJumper-v0":6000,
         'ObstacleTraverser-v0':3000,
         'ObstacleTraverser-v1':6000,
         'Hurdler-v0':6000,
         'GapJumper-v0':6000,
         'WingspanMazimizer-v0':2000,
+        'Lifter-v0':6000,
+        'CaveCrawler-v0':3000,
+        'Carrier-v0':1500,
+        'Catcher-v0':6000,
+        'Balancer-v0':2000,
     }
 
     #env_name='Walker-v0'
@@ -35,11 +42,18 @@ if __name__ == "__main__":
     #env_name='ObstacleTraverser-v0'
     #env_name='Hurdler-v0'
     #env_name='GapJumper-v0'
-    env_name='WingspanMazimizer-v0'
+    #env_name='WingspanMazimizer-v0'
+    #env_name='Lifter-v0'
+    #env_name='CaveCrawler-v0'
+    #env_name='Carrier-v0'
+    env_name='Catcher-v0'
+    #env_name='Balancer-v0'
+
+    env_name=args.env_name_for_ist if args.env_name_for_ist!=None else env_name
 
     is_pruning=True if args.is_pruning==1 else False
     is_ist=False
-    resume_gen=204
+    resume_gen=281
     robot_size=5
     scale=1
 
@@ -49,10 +63,14 @@ if __name__ == "__main__":
     suffix="_transfer:gen="+str(transfer_gen) if is_transfer else ''
     suffix="scale"+str(scale)+"_" if scale > 1 else ""
     suffix+="SuHa" if is_pruning else ""
+    suffix+="train_scale"+str(train_scale)+"_" if train_scale > 1 else ""
     suffix+=str(robot_size)+'*'+str(robot_size) if robot_size!=5 else ''
+    
+    train_iters=1024*train_scale
+    eval_timing_arr=[64*train_scale,128*train_scale,256*train_scale,512*train_scale]
 
-    train_iters=1024
-    eval_timing_arr=[64,128,256,512]
+    #train_iters=1024
+    #eval_timing_arr=[64,128,256,512]
     #train_iters=128
     #eval_timing_arr=[8,16,32,64]
     max_evaluations=env_max_eval[env_name]

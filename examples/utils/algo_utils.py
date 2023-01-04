@@ -39,6 +39,9 @@ class Structure():
         self.label = label
         self.parent_label=parent_label
 
+        self.distance=-1
+        self.torch_seed=1
+
         self.eval_history=[]
 
     def compute_fitness(self):
@@ -631,7 +634,11 @@ def refer_env_eval_step(env_name):
         'Climber-v0':400,
         'Traverser-v0':1000,
         'WingspanMazimizer-v0':600,
-        
+        'Lifter-v0':300,
+        'CaveCrawler-v0':1000,
+        'Carrier-v0':500,
+        'Catcher-v0':400,
+        'Balancer-v0':600,
     }
     return environment_steps[env_name]
 
