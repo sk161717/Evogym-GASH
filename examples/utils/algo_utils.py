@@ -625,6 +625,7 @@ def refer_env_eval_step(env_name):
     environment_steps=\
     {
         "Walker-v0":500,
+        'BridgeWalker-v0':500,
         "UpStepper-v0":600,
         "PlatformJumper-v0":1000,
         'ObstacleTraverser-v0':1000,

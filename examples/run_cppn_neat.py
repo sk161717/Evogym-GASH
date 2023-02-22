@@ -14,12 +14,14 @@ if __name__ == '__main__':
     env_max_eval=\
     {
         'Walker-v0':1000,
+        'BridgeWalker-v0':1000,
         'Climber-v0':3000,
         'Traverser-v0':3000,
     }
 
     #env_name='Walker-v0'
-    env_name='Climber-v0'
+    env_name='BridgeWalker-v0'
+    #env_name='Climber-v0'
     #env_name='Traverser-v0'
 
     is_pruning= True if args.is_pruning==1 else False

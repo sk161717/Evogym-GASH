@@ -25,7 +25,8 @@ class Job():
         use_cells=False,
         organize_by_jobs=True,
         organize_by_experiment=False,
-        organize_by_generation=False):
+        organize_by_generation=False,
+        vis_64=None):
 
         # set values
         self.name = name
@@ -36,6 +37,7 @@ class Job():
         self.population_size = population_size
         self.ranks = ranks
         self.use_cells=use_cells
+        self.vis_64=vis_64
 
         # set jobs 
         self.sub_jobs = []
@@ -77,7 +79,8 @@ class Job():
                     ranks = self.ranks,
                     use_cells=self.use_cells,
                     organize_by_experiment=False,
-                    organize_by_generation=False
+                    organize_by_generation=False,
+                    vis_64=self.vis_64
                 ))
             self.experiment_names = None
             self.env_names = None
@@ -108,9 +111,10 @@ class Job():
                 id_centroid_dict=make_id_centroid_dict(exp_name, load_dir, gen,self.use_cells)
                 for idx, reward in get_exp_gen_data(exp_name, load_dir, gen):
                     cent_x,cent_y=id_to_centroid(id_centroid_dict,self.use_cells,idx)
+                    ctrl_dir="controller64" if self.vis_64==True else "controller"
                     robots.append(Robot(
                         body_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,False,gen)}", "structure", f"{idx}.npz"),
-                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,False,gen)}", "controller", f"robot_{idx}_controller.pt"),
+                        ctrl_path = os.path.join(load_dir, exp_name, f"generation_{load_dir_calc(self.population_size,idx,False,gen)}", ctrl_dir, f"robot_{idx}_controller.pt"),
                         reward = reward,
                         env_name = env_name,
                         exp_name = exp_name if len(self.experiment_names) != 1 else None,
@@ -126,8 +130,9 @@ class Job():
         # make gifs
         for i, robot in zip(ranks, robots):
             cent_info= '' if robot.cent==(None,None) else 'x='+str(robot.cent[0])+', y='+str(robot.cent[1])
+            suffix="_64" if self.vis_64==True else ""
             save_robot_gif(
-                os.path.join(save_dir, f'{robot}_{str(robot.idx)}_{cent_info}'),
+                os.path.join(save_dir, f'{robot}_{str(robot.idx)}_{cent_info}_{suffix}'),
                 robot.env_name,
                 robot.body_path,
                 robot.ctrl_path
@@ -137,8 +142,8 @@ class Job():
 if __name__ == '__main__':
     exp_root = os.path.join('saved_data')
     save_dir = os.path.join(root_dir, 'saved_data', 'all_media')
-    env_name="WingspanMazimizer-v0"
-    seed=107
+    env_name="PlatformJumper-v0"
+    seed=101
     experiment_name = env_name+"_SuHaGA_seed:"+str(seed)
     use_cells=False
     is_transfer=False
@@ -165,10 +170,11 @@ if __name__ == '__main__':
         load_dir = exp_root,
         generations=[96],
         population_size=32,
-        ranks = [i for i in range(1)], #not use when use_cells=True
+        ranks = [i for i in range(27)], #not use when use_cells=True
         use_cells=use_cells,
         organize_by_experiment=False,
         organize_by_generation=True,
+        vis_64=False,
     )
     print(save_dir,experiment_name)
     

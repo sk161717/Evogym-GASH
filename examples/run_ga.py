@@ -21,6 +21,7 @@ if __name__ == "__main__":
     env_max_eval=\
     {
         'Walker-v0':500,
+        'BridgeWalker-v0':1000,
         "UpStepper-v0":3000//train_scale,
         "PlatformJumper-v0":6000,
         'ObstacleTraverser-v0':3000,
@@ -35,6 +36,8 @@ if __name__ == "__main__":
         'Balancer-v0':2000,
     }
 
+    env_name=None
+    env_name='BridgeWalker-v0'
     #env_name='Walker-v0'
     #env_name="UpStepper-v0"
     #env_name="PlatformJumper-v0"
@@ -46,7 +49,7 @@ if __name__ == "__main__":
     #env_name='Lifter-v0'
     #env_name='CaveCrawler-v0'
     #env_name='Carrier-v0'
-    env_name='Catcher-v0'
+    #env_name='Catcher-v0'
     #env_name='Balancer-v0'
 
     env_name=args.env_name_for_ist if args.env_name_for_ist!=None else env_name
@@ -105,7 +108,7 @@ if __name__ == "__main__":
             structure_shape = (robot_size,robot_size),
             pop_size = 32*scale,
             train_iters = train_iters,
-            num_cores = 32 if is_pruning or is_ist else 8,
+            num_cores = 32 if is_pruning or is_ist else 4,
             env_name=env_name,
             max_evaluations = max_evaluations if is_pruning else math.ceil(calc_GAEval_from_SHEvaluations(max_evaluations)),
             eval_timing_arr=eval_timing_arr,

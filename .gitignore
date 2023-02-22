@@ -1,3 +1,7 @@
+*.pdf
+examples/graphs/
+examples/.ipynb_checkpoints/
+examples/best_structures/
 evogym/simulator/.vs/
 evogym/simulator/x64/
 evogym/simulator/SimulatorCPP/x64/
