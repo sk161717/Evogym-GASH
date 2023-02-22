@@ -1,102 +1,23 @@
-# Evolution Gym
+# Supplementary of Evolutionary Co-Design Algorithm with Successive Halving
+## Gifs of WingspanMaximizer-v0
+The gifs below show the output of the state after training each VSR for 64 iterations. First one's last score(after 1024 iteration) is 0.962. Seconed one's last score is 0.09. The first structure have an open shape and are well suited for WingspanMaximizer-v0, so it is able to open its body to some extent even after training only 64 iterations. On the other hand, the second structure has a closed structure, which inevitably prevents the body from opening more than a certain degree, resulting in a lower final score. These results show that differences are likely to occur early on in tasks with structural constraints.
 
-A large-scale benchmark for co-optimizing the design and control of soft robots. As seen in [Evolution Gym: A Large-Scale Benchmark for Evolving Soft Robots](https://evolutiongym.github.io/) (**NeurIPS 2021**).
+![(0 962)_1863___64](https://user-images.githubusercontent.com/49557322/217202401-0c46a566-30bc-4dc1-8d35-0d45c76a45db.gif)
 
-[//]: # (<img src="images/teaser.gif" alt="teaser" width="800"/>)
-![teaser](images/teaser.gif)
+![(0 09)_1980__](https://user-images.githubusercontent.com/49557322/217202779-52881c18-3e49-4950-b2bf-a0ae285646f4.gif)
 
-# Installation
 
-Clone the repo and submodules:
+## Gif of ObstacleTraverser-v0
+It can be confirmed that they are moving forward by pinching the steps.
 
-```shell
-git clone --recurse-submodules https://github.com/EvolutionGym/evogym.git
-```
+![(9 471)_1726_](https://user-images.githubusercontent.com/49557322/216284792-6da6ab24-3a84-4db2-9765-745c0394f367.gif)
 
-### Requirements
+## Gifs of PlatformJumper-v0
+They all land well on their front feet.
 
-* Python 3.7/3.8
-* Linux, macOS, or Windows with [Visual Studios 2017](https://visualstudio.microsoft.com/vs/older-downloads/)
-* [OpenGL](https://www.opengl.org//)
-* [CMake](https://cmake.org/download/)
-* [PyTorch](http://pytorch.org/)
+![(6 617)_4883_](https://user-images.githubusercontent.com/49557322/217210261-214b60a0-5ff5-417b-a926-5cba57aedbc5.gif)
 
-<!--- (See [installation instructions](#opengl-installation-on-unix-based-systems) on Unix based systems) --->
+![(6 643)_3852_](https://user-images.githubusercontent.com/49557322/217210559-aab6c0ec-56e3-4f24-acec-ef439755666f.gif)
 
-On **Linux only**:
+![(6 634)_5120_](https://user-images.githubusercontent.com/49557322/217210824-ecef8b81-b246-4f94-b6cf-f3c093dd642d.gif)
 
-```shell
-sudo apt-get install xorg-dev libglu1-mesa-dev
-```
-
-Either install Python dependencies with conda:
-
-```shell
-conda env create -f environment.yml
-conda activate evogym
-```
-
-or with pip:
-
-```shell
-pip install -r requirements.txt
-```
-
-### Build and Install Package
-
-To build the C++ simulation, build all the submodules, and install `evogym` run the following command:
-
-```shell
-python setup.py install
-``` 
-
-### Test Installation
-
-cd to the `examples` folder and run the following script:
-
-```shell
-python gym_test.py
-```
-
-This script creates a random `5x5` robot in the `Walking-v0` environment. The robot is taking random actions. A window should open with a visualization of the environment -- kill the process from the terminal to close it.
-
-<!--### OpenGL installation on Unix-based systems
-
-To install OpenGL via [homebrew](https://brew.sh/), run the following commands:
-
-```shell
-brew install glfw
-```
---->
-
-# Usage
-
-## Examples
-
-To see example usage as well as to run co-design and control optimization experiments in EvoGym, please see the `examples` folder and its `README`.
-
-## Tutorials
-
-You can find tutorials for getting started with the codebase on our [website](https://evolutiongym.github.io/tutorials). Completed code from all tutorials is also available in the `tutorials` folder.
-
-## Docs
-
-You can find documentation on our [website](https://evolutiongym.github.io/documentation).
-
-## Design Tool
-
-For instructions on how to use the Evolution Gym Design Tool, please see [this repo](https://github.com/EvolutionGym/evogym-design-tool).
-
-# Citation
-
-If you find our repository helpful to your research, please cite our paper:
-
-```
-@article{bhatia2021evolution,
-  title={Evolution gym: A large-scale benchmark for evolving soft robots},
-  author={Bhatia, Jagdeep and Jackson, Holly and Tian, Yunsheng and Xu, Jie and Matusik, Wojciech},
-  journal={Advances in Neural Information Processing Systems},
-  volume={34},
-  year={2021}
-}
-```
